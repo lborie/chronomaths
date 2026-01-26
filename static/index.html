@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronomaths - Apprends tes tables!</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Écran d'accueil -->
+        <div id="screen-home" class="screen active">
+            <h1 class="title">
+                <span class="emoji">🧮</span>
+                Chronomaths
+                <span class="emoji">⏱️</span>
+            </h1>
+            <p class="subtitle">Deviens une championne des multiplications!</p>
+
+            <div class="mode-selection">
+                <h2>Choisis ton défi:</h2>
+                <div class="modes">
+                    <button class="mode-btn" data-time="300" data-questions="24">
+                        <span class="mode-icon">🚀</span>
+                        <span class="mode-title">Sprint</span>
+                        <span class="mode-details">5 minutes</span>
+                        <span class="mode-questions">24 calculs</span>
+                    </button>
+                    <button class="mode-btn" data-time="600" data-questions="48">
+                        <span class="mode-icon">🏃</span>
+                        <span class="mode-title">Course</span>
+                        <span class="mode-details">10 minutes</span>
+                        <span class="mode-questions">48 calculs</span>
+                    </button>
+                    <button class="mode-btn" data-time="900" data-questions="72">
+                        <span class="mode-icon">🏆</span>
+                        <span class="mode-title">Marathon</span>
+                        <span class="mode-details">15 minutes</span>
+                        <span class="mode-questions">72 calculs</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Écran de jeu -->
+        <div id="screen-game" class="screen">
+            <div class="game-header">
+                <div class="timer">
+                    <span class="timer-icon">⏱️</span>
+                    <span id="timer-display">05:00</span>
+                </div>
+                <div class="progress">
+                    <span id="current-question">1</span>/<span id="total-questions">24</span>
+                </div>
+            </div>
+
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+
+            <div class="question-card">
+                <div class="question">
+                    <span id="num1" class="number">7</span>
+                    <span class="operator">×</span>
+                    <span id="num2" class="number">8</span>
+                    <span class="equals">=</span>
+                    <span class="answer-box">?</span>
+                </div>
+            </div>
+
+            <form id="answer-form">
+                <input
+                    type="number"
+                    id="answer-input"
+                    class="answer-input"
+                    placeholder="Ta réponse"
+                    autocomplete="off"
+                    inputmode="numeric"
+                    required
+                >
+                <button type="submit" class="submit-btn">Valider</button>
+            </form>
+
+            <div id="feedback" class="feedback"></div>
+        </div>
+
+        <!-- Écran de résultats -->
+        <div id="screen-results" class="screen">
+            <div id="results-header" class="results-header">
+                <span class="results-icon">🎉</span>
+                <h2>Bravo!</h2>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card correct">
+                    <span class="stat-icon">✅</span>
+                    <span id="stat-correct" class="stat-value">0</span>
+                    <span class="stat-label">Bonnes réponses</span>
+                </div>
+                <div class="stat-card wrong">
+                    <span class="stat-icon">❌</span>
+                    <span id="stat-wrong" class="stat-value">0</span>
+                    <span class="stat-label">Erreurs</span>
+                </div>
+                <div class="stat-card time">
+                    <span class="stat-icon">⏱️</span>
+                    <span id="stat-time" class="stat-value">00:00</span>
+                    <span class="stat-label">Temps</span>
+                </div>
+                <div class="stat-card score">
+                    <span class="stat-icon">🎯</span>
+                    <span id="stat-score" class="stat-value">0%</span>
+                    <span class="stat-label">Score</span>
+                </div>
+            </div>
+
+            <div id="errors-section" class="errors-section">
+                <h3>À réviser:</h3>
+                <div id="errors-list" class="errors-list"></div>
+            </div>
+
+            <button id="play-again" class="play-again-btn">
+                <span>🔄</span> Rejouer
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
