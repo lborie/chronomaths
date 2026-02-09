@@ -297,9 +297,8 @@ multiEl.btnBackHome.addEventListener('click', () => {
     showScreen('home');
 });
 
-// Join game
-multiEl.joinForm.addEventListener('submit', (e) => {
-    e.preventDefault();
+// Join game - use click instead of form submit (Safari buffers network during submit)
+function joinGame() {
     const name = multiEl.playerName.value.trim();
     if (!name) return;
 
@@ -308,6 +307,11 @@ multiEl.joinForm.addEventListener('submit', (e) => {
     multi.opponentScore = 0;
 
     connectWebSocket(name);
+}
+
+document.getElementById('btn-join').addEventListener('click', joinGame);
+multiEl.playerName.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') joinGame();
 });
 
 const waitingStatusEl = document.getElementById('waiting-status');
