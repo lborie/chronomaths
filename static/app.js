@@ -307,10 +307,21 @@ multiEl.joinForm.addEventListener('submit', (e) => {
     multi.myScore = 0;
     multi.opponentScore = 0;
 
+    // Show waiting screen immediately for better feedback
+    multiEl.waitingName.textContent = multi.playerName;
+    showScreen('multiWaiting');
+
     connectWebSocket(name);
 });
 
 function connectWebSocket(name) {
+    // Close any existing connection first
+    if (multi.ws) {
+        multi.ws.onclose = null;
+        multi.ws.close();
+        multi.ws = null;
+    }
+
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${location.host}/ws`);
     multi.ws = ws;
@@ -322,6 +333,10 @@ function connectWebSocket(name) {
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         handleServerMessage(msg);
+    };
+
+    ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
     };
 
     ws.onclose = () => {
@@ -379,9 +394,13 @@ function startMultiRace(msg) {
     multiEl.multiFeedback.textContent = '';
     multiEl.multiFeedback.className = 'feedback';
 
-    showScreen('multiRace');
     multiEl.multiAnswerInput.value = '';
-    multiEl.multiAnswerInput.focus();
+    showScreen('multiRace');
+
+    // Defer focus to next frame - Safari/iPad blocks .focus() outside user gestures
+    requestAnimationFrame(() => {
+        multiEl.multiAnswerInput.focus();
+    });
 }
 
 function handleScoreUpdate(msg) {

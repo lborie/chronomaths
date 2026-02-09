@@ -28,6 +28,7 @@ type Player struct {
 	Name  string `json:"name"`
 	Score int    `json:"score"`
 	conn  *websocket.Conn
+	writeMu sync.Mutex
 }
 
 type Room struct {
@@ -110,13 +111,17 @@ func generateQuestion() Question {
 	return Question{A: a, B: b, Answer: a * b}
 }
 
-func sendJSON(conn *websocket.Conn, v interface{}) {
+func sendJSON(p *Player, v interface{}) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		log.Println("marshal error:", err)
 		return
 	}
-	conn.WriteMessage(websocket.TextMessage, data)
+	p.writeMu.Lock()
+	defer p.writeMu.Unlock()
+	if err := p.conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		log.Println("write error:", err)
+	}
 }
 
 func handleWS(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +183,7 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 		waitingRoom.Players[0] = player
 		rooms[conn] = waitingRoom
 
-		sendJSON(conn, WaitingMsg{Type: "waiting", Name: player.Name})
+		sendJSON(player, WaitingMsg{Type: "waiting", Name: player.Name})
 	} else {
 		// Second player joins, start the game
 		room := waitingRoom
@@ -194,18 +199,25 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 		p0 := room.Players[0]
 		p1 := room.Players[1]
 
-		sendJSON(p0.conn, StartMsg{
+		startMsg0 := StartMsg{
 			Type:     "start",
 			You:      p0.Name,
 			Opponent: p1.Name,
 			Question: room.question,
-		})
-		sendJSON(p1.conn, StartMsg{
+		}
+		startMsg1 := StartMsg{
 			Type:     "start",
 			You:      p1.Name,
 			Opponent: p0.Name,
 			Question: room.question,
-		})
+		}
+
+		// Send to both players concurrently to avoid one blocking the other
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); sendJSON(p0, startMsg0) }()
+		go func() { defer wg.Done(); sendJSON(p1, startMsg1) }()
+		wg.Wait()
 	}
 }
 
@@ -252,7 +264,7 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 	room.question = newQuestion
 
 	// Send score update to the answering player
-	sendJSON(conn, ScoreUpdateMsg{
+	sendJSON(player, ScoreUpdateMsg{
 		Type:          "scoreUpdate",
 		YourScore:     player.Score,
 		OpponentScore: opponent.Score,
@@ -262,7 +274,7 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 	})
 
 	// Send opponent score update to the other player
-	sendJSON(opponent.conn, OpponentScoreMsg{
+	sendJSON(opponent, OpponentScoreMsg{
 		Type:          "opponentScore",
 		OpponentScore: player.Score,
 	})
@@ -270,8 +282,8 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 	// Check win
 	if player.Score >= winScore {
 		room.started = false
-		sendJSON(conn, WinMsg{Type: "win", Winner: player.Name})
-		sendJSON(opponent.conn, WinMsg{Type: "win", Winner: player.Name})
+		sendJSON(player, WinMsg{Type: "win", Winner: player.Name})
+		sendJSON(opponent, WinMsg{Type: "win", Winner: player.Name})
 	}
 }
 
@@ -296,7 +308,7 @@ func handleDisconnect(conn *websocket.Conn) {
 	// Notify the other player
 	for _, p := range room.Players {
 		if p != nil && p.conn != conn {
-			sendJSON(p.conn, OpponentLeftMsg{Type: "opponentLeft"})
+			sendJSON(p, OpponentLeftMsg{Type: "opponentLeft"})
 			delete(rooms, p.conn)
 		}
 	}
