@@ -307,12 +307,10 @@ multiEl.joinForm.addEventListener('submit', (e) => {
     multi.myScore = 0;
     multi.opponentScore = 0;
 
-    // Show waiting screen immediately for better feedback
-    multiEl.waitingName.textContent = multi.playerName;
-    showScreen('multiWaiting');
-
     connectWebSocket(name);
 });
+
+const waitingStatusEl = document.getElementById('waiting-status');
 
 function connectWebSocket(name) {
     // Close any existing connection first
@@ -322,12 +320,20 @@ function connectWebSocket(name) {
         multi.ws = null;
     }
 
+    // Show waiting screen with "Connexion..." status
+    multiEl.waitingName.textContent = name;
+    waitingStatusEl.textContent = 'Connexion...';
+    showScreen('multiWaiting');
+
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${location.host}/ws`);
+    const wsUrl = `${protocol}//${location.host}/ws`;
+    console.log('[WS] connecting to', wsUrl);
+    const ws = new WebSocket(wsUrl);
     multi.ws = ws;
 
     ws.onopen = () => {
         console.log('[WS] connected, sending join');
+        waitingStatusEl.textContent = '';
         ws.send(JSON.stringify({ type: 'join', data: { name } }));
     };
 
@@ -339,6 +345,7 @@ function connectWebSocket(name) {
 
     ws.onerror = (err) => {
         console.error('[WS] error:', err);
+        waitingStatusEl.textContent = 'Erreur de connexion';
     };
 
     ws.onclose = () => {

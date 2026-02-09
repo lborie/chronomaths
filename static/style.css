@@ -623,6 +623,12 @@ body {
     font-weight: 600;
 }
 
+.waiting-status {
+    color: var(--text-muted, #999);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
 .waiting-dots {
     display: flex;
     justify-content: center;
