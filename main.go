@@ -183,6 +183,7 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 		waitingRoom.Players[0] = player
 		rooms[conn] = waitingRoom
 
+		log.Printf("[JOIN] %s creates room, sending waiting", player.Name)
 		sendJSON(player, WaitingMsg{Type: "waiting", Name: player.Name})
 	} else {
 		// Second player joins, start the game
@@ -212,12 +213,10 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 			Question: room.question,
 		}
 
-		// Send to both players concurrently to avoid one blocking the other
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() { defer wg.Done(); sendJSON(p0, startMsg0) }()
-		go func() { defer wg.Done(); sendJSON(p1, startMsg1) }()
-		wg.Wait()
+		log.Printf("[JOIN] %s joins %s's room, sending start to both", p1.Name, p0.Name)
+		sendJSON(p0, startMsg0)
+		sendJSON(p1, startMsg1)
+		log.Printf("[JOIN] start messages sent to both players")
 	}
 }
 
@@ -290,6 +289,13 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 func handleDisconnect(conn *websocket.Conn) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
+
+	player := players[conn]
+	name := "unknown"
+	if player != nil {
+		name = player.Name
+	}
+	log.Printf("[DISCONNECT] %s disconnected", name)
 
 	room, ok := rooms[conn]
 	delete(rooms, conn)

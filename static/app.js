@@ -327,24 +327,28 @@ function connectWebSocket(name) {
     multi.ws = ws;
 
     ws.onopen = () => {
+        console.log('[WS] connected, sending join');
         ws.send(JSON.stringify({ type: 'join', data: { name } }));
     };
 
     ws.onmessage = (event) => {
+        console.log('[WS] received:', event.data);
         const msg = JSON.parse(event.data);
         handleServerMessage(msg);
     };
 
     ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
+        console.error('[WS] error:', err);
     };
 
     ws.onclose = () => {
+        console.log('[WS] closed');
         multi.ws = null;
     };
 }
 
 function handleServerMessage(msg) {
+    console.log('[MSG] handling:', msg.type);
     switch (msg.type) {
         case 'waiting':
             multiEl.waitingName.textContent = multi.playerName;
@@ -352,6 +356,7 @@ function handleServerMessage(msg) {
             break;
 
         case 'start':
+            console.log('[MSG] start received, opponent:', msg.opponent);
             multi.opponentName = msg.opponent;
             multi.myScore = 0;
             multi.opponentScore = 0;
@@ -395,7 +400,9 @@ function startMultiRace(msg) {
     multiEl.multiFeedback.className = 'feedback';
 
     multiEl.multiAnswerInput.value = '';
+    console.log('[RACE] showing multiRace screen');
     showScreen('multiRace');
+    console.log('[RACE] multiRace screen active:', screens.multiRace.classList.contains('active'));
 
     // Defer focus to next frame - Safari/iPad blocks .focus() outside user gestures
     requestAnimationFrame(() => {
