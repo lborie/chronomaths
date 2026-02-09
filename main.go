@@ -125,11 +125,13 @@ func sendJSON(p *Player, v interface{}) {
 }
 
 func handleWS(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[WS] upgrade request from %s (User-Agent: %s)", r.RemoteAddr, r.UserAgent())
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("upgrade error:", err)
+		log.Printf("[WS] upgrade FAILED from %s: %v", r.RemoteAddr, err)
 		return
 	}
+	log.Printf("[WS] upgrade OK from %s", r.RemoteAddr)
 	defer func() {
 		handleDisconnect(conn)
 		conn.Close()
