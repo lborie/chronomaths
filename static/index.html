@@ -44,6 +44,19 @@
                     <span>ou</span>
                 </div>
 
+                <button id="btn-posee" class="multi-btn posee-btn">
+                    <span class="multi-icon">📝</span>
+                    <span class="multi-text">
+                        <span class="multi-title">Multiplications posées</span>
+                        <span class="multi-details">Apprends à poser les multiplications avec retenue</span>
+                    </span>
+                    <span class="multi-arrow">→</span>
+                </button>
+
+                <div class="multi-separator">
+                    <span>ou</span>
+                </div>
+
                 <button id="btn-multi" class="multi-btn">
                     <span class="multi-icon">🎮</span>
                     <span class="multi-text">
@@ -51,6 +64,65 @@
                         <span class="multi-details">Course de fusées - Premier à 20 points!</span>
                     </span>
                     <span class="multi-arrow">→</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Écran multiplication posée -->
+        <div id="screen-posee" class="screen">
+            <div class="posee-container">
+                <div class="posee-header">
+                    <h2 class="posee-title">
+                        <span>📝</span> Multiplication posée
+                    </h2>
+                    <div class="posee-score">
+                        <span class="posee-score-correct" id="posee-correct-count">0</span> ✅
+                        <span class="posee-score-wrong" id="posee-wrong-count">0</span> ❌
+                    </div>
+                </div>
+
+                <!-- La multiplication posée sera générée dynamiquement -->
+                <div id="posee-grid" class="posee-grid"></div>
+
+                <div id="posee-feedback" class="feedback"></div>
+
+                <div class="posee-actions">
+                    <button id="btn-posee-validate" class="submit-btn posee-validate-btn">Vérifier</button>
+                    <button id="btn-posee-next" class="submit-btn posee-next-btn" style="display:none;">Suivant →</button>
+                </div>
+
+                <button id="btn-posee-stop" class="back-btn posee-stop-btn">← Arrêter et voir les résultats</button>
+            </div>
+        </div>
+
+        <!-- Écran résultats multiplication posée -->
+        <div id="screen-posee-results" class="screen">
+            <div class="posee-results-card">
+                <div class="results-header">
+                    <span id="posee-results-icon" class="results-icon">🎉</span>
+                    <h2 id="posee-results-title">Bravo!</h2>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card correct">
+                        <span class="stat-icon">✅</span>
+                        <span id="posee-stat-correct" class="stat-value">0</span>
+                        <span class="stat-label">Bonnes réponses</span>
+                    </div>
+                    <div class="stat-card wrong">
+                        <span class="stat-icon">❌</span>
+                        <span id="posee-stat-wrong" class="stat-value">0</span>
+                        <span class="stat-label">Erreurs</span>
+                    </div>
+                </div>
+
+                <div id="posee-errors-section" class="errors-section">
+                    <h3>À retravailler:</h3>
+                    <div id="posee-errors-list" class="errors-list"></div>
+                </div>
+
+                <button id="btn-posee-replay" class="play-again-btn">
+                    <span>🔄</span> Rejouer
                 </button>
             </div>
         </div>

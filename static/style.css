@@ -1054,6 +1054,204 @@ body::after {
 }
 
 /* ============================================================
+   MULTIPLICATION POSÉE
+   ============================================================ */
+
+.posee-container {
+    background: var(--card-bg);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(10px);
+}
+
+.posee-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.posee-title {
+    font-size: 1.3rem;
+    color: var(--text);
+}
+
+.posee-score {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.posee-score-correct {
+    color: var(--success);
+}
+
+.posee-score-wrong {
+    color: var(--error);
+}
+
+/* Grille de la multiplication posée */
+.posee-grid {
+    --posee-cols: 4;
+    background: linear-gradient(135deg, #fefefe, #f8f9fa);
+    border: 2px solid #e9ecef;
+    border-radius: 1rem;
+    padding: 1.5rem 1rem 1rem;
+    margin: 0 auto 1.25rem;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.posee-row {
+    display: grid;
+    grid-template-columns: repeat(var(--posee-cols), 48px);
+    gap: 4px;
+}
+
+.posee-cell {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.posee-digit {
+    color: var(--text);
+}
+
+.posee-operator {
+    color: var(--accent-dark);
+    font-size: 1.5rem;
+}
+
+.posee-separator {
+    width: 100%;
+    max-width: calc(var(--posee-cols) * 52px);
+    height: 3px;
+    background: var(--text);
+    border-radius: 2px;
+    margin: 0.25rem 0;
+}
+
+/* Retenues */
+.posee-carry-row {
+    gap: 4px;
+}
+
+.posee-carry-cell {
+    width: 48px;
+    height: 24px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    color: transparent;
+    transition: color 0.3s;
+}
+
+.posee-carry-cell.posee-carry-visible {
+    color: var(--primary);
+}
+
+/* Inputs du résultat */
+.posee-result-row {
+    margin-top: 0.25rem;
+}
+
+.posee-input {
+    width: 44px;
+    height: 44px;
+    border: 2px solid #dee2e6;
+    border-radius: 0.5rem;
+    text-align: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+    font-family: 'Courier New', Courier, monospace;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.3s;
+    background: white;
+    padding: 0;
+}
+
+.posee-input:focus {
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 3px rgba(72, 219, 251, 0.2);
+}
+
+.posee-input-correct {
+    border-color: var(--success) !important;
+    background: var(--success-light) !important;
+    color: var(--success) !important;
+}
+
+.posee-input-wrong {
+    border-color: var(--error) !important;
+    background: var(--error-light) !important;
+    color: var(--error) !important;
+    animation: shake 0.4s ease;
+}
+
+/* Boutons d'action */
+.posee-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.posee-validate-btn,
+.posee-next-btn {
+    flex: 1;
+}
+
+.posee-next-btn {
+    background: linear-gradient(135deg, var(--success), #1abc9c);
+}
+
+.posee-next-btn:hover {
+    box-shadow: 0 8px 20px rgba(46, 213, 115, 0.35);
+}
+
+.posee-stop-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+/* Posee button style on home (green accent) */
+.posee-btn {
+    border-color: var(--success) !important;
+    background: linear-gradient(135deg, #f0fff4, #e8f5e9) !important;
+}
+
+.posee-btn:hover {
+    border-color: #27ae60 !important;
+    box-shadow: 0 8px 25px rgba(46, 213, 115, 0.35) !important;
+}
+
+/* Results card for posee */
+.posee-results-card {
+    background: var(--card-bg);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(10px);
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 400px) {
@@ -1090,6 +1288,28 @@ body::after {
 
     .stat-value {
         font-size: 1.5rem;
+    }
+
+    .posee-cell {
+        width: 38px;
+        height: 38px;
+        font-size: 1.4rem;
+    }
+
+    .posee-input {
+        width: 36px;
+        height: 36px;
+        font-size: 1.4rem;
+    }
+
+    .posee-row {
+        grid-template-columns: repeat(var(--posee-cols), 40px);
+    }
+
+    .posee-carry-cell {
+        width: 38px;
+        height: 20px !important;
+        font-size: 0.75rem !important;
     }
 }
 
