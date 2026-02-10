@@ -39,10 +39,142 @@
                         <span class="mode-questions">72 calculs</span>
                     </button>
                 </div>
+
+                <div class="multi-separator">
+                    <span>ou</span>
+                </div>
+
+                <button id="btn-multi" class="multi-btn">
+                    <span class="multi-icon">🎮</span>
+                    <span class="multi-text">
+                        <span class="multi-title">Multi Joueur</span>
+                        <span class="multi-details">Course de fusées - Premier à 20 points!</span>
+                    </span>
+                    <span class="multi-arrow">→</span>
+                </button>
             </div>
         </div>
 
-        <!-- Écran de jeu -->
+        <!-- Écran rejoindre multi -->
+        <div id="screen-multi-join" class="screen">
+            <h1 class="title">
+                <span class="emoji">🎮</span>
+                Multi Joueur
+                <span class="emoji">🚀</span>
+            </h1>
+            <p class="subtitle">Course de fusées!</p>
+
+            <div class="join-card">
+                <h2>Rejoindre une partie</h2>
+                <div id="join-form">
+                    <input
+                        type="text"
+                        id="player-name"
+                        class="name-input"
+                        placeholder="Ton prénom"
+                        maxlength="15"
+                        autocomplete="off"
+                    >
+                    <button type="button" id="btn-join" class="join-btn">Rejoindre</button>
+                </div>
+                <button id="btn-back-home" class="back-btn">← Retour</button>
+            </div>
+        </div>
+
+        <!-- Écran attente -->
+        <div id="screen-multi-waiting" class="screen">
+            <div class="waiting-card">
+                <div class="waiting-rocket">🚀</div>
+                <h2>En attente d'un adversaire...</h2>
+                <p id="waiting-name" class="waiting-name"></p>
+                <p id="waiting-status" class="waiting-status">Connexion...</p>
+                <div class="waiting-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Écran course multi -->
+        <div id="screen-multi-race" class="screen">
+            <div class="race-container">
+                <!-- Piste de course -->
+                <div class="race-track">
+                    <div class="track-labels">
+                        <span class="track-start">0</span>
+                        <span class="track-end">20</span>
+                    </div>
+                    <div class="track-lane">
+                        <span id="player1-name" class="lane-name">Joueur 1</span>
+                        <div class="lane-bar">
+                            <div id="player1-progress" class="lane-fill player1-fill">
+                                <span class="rocket-icon">🚀</span>
+                            </div>
+                        </div>
+                        <span id="player1-score" class="lane-score">0</span>
+                    </div>
+                    <div class="track-lane">
+                        <span id="player2-name" class="lane-name">Joueur 2</span>
+                        <div class="lane-bar">
+                            <div id="player2-progress" class="lane-fill player2-fill">
+                                <span class="rocket-icon">🚀</span>
+                            </div>
+                        </div>
+                        <span id="player2-score" class="lane-score">0</span>
+                    </div>
+                </div>
+
+                <!-- Question -->
+                <div class="race-question-card">
+                    <div class="race-question">
+                        <span id="multi-num1" class="number">7</span>
+                        <span class="operator">×</span>
+                        <span id="multi-num2" class="number">8</span>
+                        <span class="equals">=</span>
+                        <span class="answer-box">?</span>
+                    </div>
+                </div>
+
+                <form id="multi-answer-form">
+                    <input
+                        type="number"
+                        id="multi-answer-input"
+                        class="answer-input"
+                        placeholder="Ta réponse"
+                        autocomplete="off"
+                        inputmode="numeric"
+                        required
+                    >
+                    <button type="submit" class="submit-btn">Valider</button>
+                </form>
+
+                <div id="multi-feedback" class="feedback"></div>
+            </div>
+        </div>
+
+        <!-- Écran victoire -->
+        <div id="screen-multi-win" class="screen">
+            <div class="win-card">
+                <div id="win-icon" class="win-icon">🏆</div>
+                <h2 id="win-title" class="win-title">Victoire!</h2>
+                <p id="win-message" class="win-message"></p>
+                <div class="win-scores">
+                    <div class="win-score-card">
+                        <span id="win-your-name" class="win-score-name">Toi</span>
+                        <span id="win-your-score" class="win-score-value">0</span>
+                    </div>
+                    <span class="win-vs">VS</span>
+                    <div class="win-score-card">
+                        <span id="win-opponent-name" class="win-score-name">Adversaire</span>
+                        <span id="win-opponent-score" class="win-score-value">0</span>
+                    </div>
+                </div>
+                <button id="btn-play-again-multi" class="play-again-btn">
+                    <span>🔄</span> Rejouer
+                </button>
+            </div>
+        </div>
+
+        <!-- Écran de jeu solo -->
         <div id="screen-game" class="screen">
             <div class="game-header">
                 <div class="timer">
@@ -84,7 +216,7 @@
             <div id="feedback" class="feedback"></div>
         </div>
 
-        <!-- Écran de résultats -->
+        <!-- Écran de résultats solo -->
         <div id="screen-results" class="screen">
             <div id="results-header" class="results-header">
                 <span class="results-icon">🎉</span>
