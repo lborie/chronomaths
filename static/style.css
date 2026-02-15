@@ -32,12 +32,13 @@
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: var(--bg-gradient);
-    background-attachment: fixed;
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     padding: 1rem;
+    padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     position: relative;
 }
 
@@ -176,12 +177,6 @@ body::after {
     background: white;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.mode-btn:hover {
-    border-color: var(--primary);
-    transform: translateX(5px) scale(1.02);
-    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.25);
 }
 
 .mode-btn:active {
@@ -361,11 +356,6 @@ body::after {
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(255, 107, 107, 0.35);
-}
-
 .submit-btn:active {
     transform: scale(0.95);
 }
@@ -465,10 +455,6 @@ body::after {
     gap: 0.25rem;
     border: 2px solid transparent;
     transition: transform 0.2s;
-}
-
-.stat-card:hover {
-    transform: translateY(-3px);
 }
 
 .stat-card.correct {
@@ -571,11 +557,6 @@ body::after {
     50% { background-position: 100% 50%; }
 }
 
-.play-again-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 30px rgba(255, 107, 107, 0.3);
-}
-
 .play-again-btn:active {
     transform: scale(0.97);
 }
@@ -616,12 +597,6 @@ body::after {
     background: linear-gradient(135deg, #fffdf0, #fef9e7);
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.multi-btn:hover {
-    border-color: var(--accent-dark);
-    transform: translateX(5px) scale(1.02);
-    box-shadow: 0 8px 25px rgba(254, 202, 87, 0.35);
 }
 
 .multi-btn:active {
@@ -706,11 +681,6 @@ body::after {
     border-radius: 1rem;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.join-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(254, 202, 87, 0.4);
 }
 
 .join-btn:active {
@@ -1235,11 +1205,6 @@ body::after {
     background: linear-gradient(135deg, #f0fff4, #e8f5e9) !important;
 }
 
-.posee-btn:hover {
-    border-color: #27ae60 !important;
-    box-shadow: 0 8px 25px rgba(46, 213, 115, 0.35) !important;
-}
-
 /* Results card for posee */
 .posee-results-card {
     background: var(--card-bg);
@@ -1291,29 +1256,78 @@ body::after {
     }
 
     .posee-cell {
-        width: 38px;
-        height: 38px;
+        width: 40px;
+        height: 44px;
         font-size: 1.4rem;
     }
 
     .posee-input {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 44px;
         font-size: 1.4rem;
     }
 
     .posee-row {
-        grid-template-columns: repeat(var(--posee-cols), 40px);
+        grid-template-columns: repeat(var(--posee-cols), 42px);
     }
 
     .posee-carry-cell {
-        width: 38px;
+        width: 40px;
         height: 20px !important;
         font-size: 0.75rem !important;
+    }
+
+    /* Race track responsive */
+    .lane-name {
+        min-width: 50px;
+        font-size: 0.7rem;
+    }
+
+    .lane-bar {
+        height: 26px;
+    }
+
+    .lane-fill {
+        min-width: 26px;
+    }
+
+    .rocket-icon {
+        font-size: 1rem;
+    }
+
+    .lane-score {
+        font-size: 0.85rem;
+    }
+
+    .track-labels {
+        font-size: 0.65rem;
+    }
+
+    /* Win scores wrap */
+    .win-scores {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .win-score-card {
+        min-width: 80px;
+        padding: 0.75rem 1rem;
+    }
+
+    .win-score-value {
+        font-size: 1.5rem;
+    }
+
+    .win-title {
+        font-size: 1.5rem;
     }
 }
 
 @media (min-width: 600px) {
+    .container {
+        max-width: 560px;
+    }
+
     .modes {
         flex-direction: row;
     }
@@ -1333,5 +1347,63 @@ body::after {
 
     .mode-details, .mode-questions {
         justify-self: center;
+    }
+}
+
+@media (min-width: 768px) {
+    .container {
+        max-width: 620px;
+    }
+}
+
+/* ============================================================
+   HOVER - only for devices with a pointer (not touch)
+   ============================================================ */
+@media (hover: hover) and (pointer: fine) {
+    .mode-btn:hover {
+        border-color: var(--primary);
+        transform: translateX(5px) scale(1.02);
+        box-shadow: 0 8px 25px rgba(255, 107, 107, 0.25);
+    }
+
+    .multi-btn:hover {
+        border-color: var(--accent-dark);
+        transform: translateX(5px) scale(1.02);
+        box-shadow: 0 8px 25px rgba(254, 202, 87, 0.35);
+    }
+
+    .posee-btn:hover {
+        border-color: #27ae60 !important;
+        box-shadow: 0 8px 25px rgba(46, 213, 115, 0.35) !important;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(255, 107, 107, 0.35);
+    }
+
+    .join-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(254, 202, 87, 0.4);
+    }
+
+    .play-again-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 30px rgba(255, 107, 107, 0.3);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+    }
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }
