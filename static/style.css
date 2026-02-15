@@ -330,6 +330,7 @@ body::after {
 
 .answer-input {
     flex: 1;
+    min-width: 0;
     padding: 1rem 1.25rem;
     font-size: 1.5rem;
     border: 2px solid #f0f0f0;
@@ -1219,6 +1220,101 @@ body::after {
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+
+/* Compact game screens on short viewports (mobile, landscape) */
+@media (max-height: 700px) {
+    #screen-game {
+        padding: 1rem;
+    }
+
+    .game-header {
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-bar {
+        margin-bottom: 0.75rem;
+    }
+
+    .question-card {
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .feedback {
+        min-height: 1.5rem;
+        font-size: 1rem;
+        padding: 0.25rem;
+    }
+
+    /* Race screen compact */
+    .race-container {
+        padding: 1rem;
+    }
+
+    .race-track {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .race-question-card {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    /* Posee compact */
+    .posee-container {
+        padding: 1rem;
+    }
+
+    .posee-header {
+        margin-bottom: 0.75rem;
+    }
+
+    .posee-grid {
+        padding: 1rem 0.75rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+}
+
+@media (max-height: 500px) {
+    .number {
+        font-size: 2rem;
+    }
+
+    .operator, .equals {
+        font-size: 1.5rem;
+    }
+
+    .answer-box {
+        font-size: 2rem;
+        min-width: 50px;
+    }
+
+    .question-card {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-bar {
+        margin-bottom: 0.5rem;
+        height: 6px;
+    }
+
+    .timer {
+        font-size: 1.2rem;
+    }
+
+    .answer-input {
+        padding: 0.5rem 0.75rem;
+        font-size: 1.2rem;
+    }
+
+    .submit-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 1rem;
+    }
+}
+
 @media (max-width: 400px) {
     .title {
         font-size: 2rem;
