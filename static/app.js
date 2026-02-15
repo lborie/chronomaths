@@ -243,6 +243,11 @@ elements.playAgain.addEventListener('click', () => {
     showScreen('home');
 });
 
+document.getElementById('btn-stop-game').addEventListener('click', () => {
+    clearInterval(state.timerInterval);
+    showScreen('home');
+});
+
 document.addEventListener('touchstart', () => {}, { passive: true });
 
 // ============================================================
