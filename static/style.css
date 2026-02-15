@@ -1123,15 +1123,57 @@ body::after {
 
 .posee-carry-cell {
     width: 48px;
-    height: 24px !important;
+    height: 28px !important;
     font-size: 0.85rem !important;
     font-weight: 600 !important;
-    color: transparent;
-    transition: color 0.3s;
 }
 
-.posee-carry-cell.posee-carry-visible {
+.posee-carry-input {
+    width: 28px;
+    height: 28px;
+    border: 1.5px dashed #ccc;
+    border-radius: 0.35rem;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: 'Courier New', Courier, monospace;
     color: var(--primary);
+    outline: none;
+    background: rgba(255, 107, 107, 0.04);
+    padding: 0;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.3s;
+}
+
+.posee-carry-input:focus {
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 2px rgba(72, 219, 251, 0.15);
+    background: white;
+}
+
+.posee-carry-input::placeholder {
+    color: #ddd;
+    font-size: 0.7rem;
+}
+
+.posee-carry-correct {
+    border-color: var(--success) !important;
+    border-style: solid !important;
+    background: var(--success-light) !important;
+    color: var(--success) !important;
+}
+
+.posee-carry-wrong {
+    border-color: var(--error) !important;
+    border-style: solid !important;
+    background: var(--error-light) !important;
+    color: var(--error) !important;
+}
+
+.posee-carry-shown {
+    border-style: solid !important;
+    border-color: var(--primary) !important;
+    background: var(--primary-light) !important;
+    color: var(--primary) !important;
 }
 
 /* Inputs du résultat */
@@ -1369,8 +1411,14 @@ body::after {
 
     .posee-carry-cell {
         width: 40px;
-        height: 20px !important;
+        height: 24px !important;
         font-size: 0.75rem !important;
+    }
+
+    .posee-carry-input {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
     }
 
     /* Race track responsive */
