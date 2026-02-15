@@ -19,6 +19,7 @@ const screens = {
     home: document.getElementById('screen-home'),
     game: document.getElementById('screen-game'),
     results: document.getElementById('screen-results'),
+    poseeDifficulty: document.getElementById('screen-posee-difficulty'),
     posee: document.getElementById('screen-posee'),
     poseeResults: document.getElementById('screen-posee-results'),
     multiJoin: document.getElementById('screen-multi-join'),
@@ -249,8 +250,9 @@ document.addEventListener('touchstart', () => {}, { passive: true });
 // ============================================================
 
 const poseeState = {
-    a: 0,           // multiplicande (2-3 chiffres)
-    b: 0,           // multiplicateur (1 chiffre)
+    a: 0,           // multiplicande
+    b: 0,           // multiplicateur
+    difficulty: 'easy', // 'easy' | 'medium' | 'hard'
     correctCount: 0,
     wrongCount: 0,
     history: [],     // historique des calculs
@@ -259,6 +261,8 @@ const poseeState = {
 
 const poseeEl = {
     btnPosee: document.getElementById('btn-posee'),
+    btnPoseeBack: document.getElementById('btn-posee-back'),
+    difficultyBtns: document.querySelectorAll('.difficulty-btn'),
     grid: document.getElementById('posee-grid'),
     feedback: document.getElementById('posee-feedback'),
     btnValidate: document.getElementById('btn-posee-validate'),
@@ -275,26 +279,41 @@ const poseeEl = {
     btnReplay: document.getElementById('btn-posee-replay')
 };
 
-// Navigate to posee mode
+// Navigate to posee difficulty selection
 poseeEl.btnPosee.addEventListener('click', () => {
-    poseeState.correctCount = 0;
-    poseeState.wrongCount = 0;
-    poseeState.history = [];
-    poseeEl.correctCount.textContent = '0';
-    poseeEl.wrongCount.textContent = '0';
-    generatePosee();
-    showScreen('posee');
+    showScreen('poseeDifficulty');
+});
+
+poseeEl.btnPoseeBack.addEventListener('click', () => {
+    showScreen('home');
+});
+
+// Difficulty buttons → start posee with selected difficulty
+poseeEl.difficultyBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        poseeState.difficulty = btn.dataset.difficulty;
+        poseeState.correctCount = 0;
+        poseeState.wrongCount = 0;
+        poseeState.history = [];
+        poseeEl.correctCount.textContent = '0';
+        poseeEl.wrongCount.textContent = '0';
+        generatePosee();
+        showScreen('posee');
+    });
 });
 
 function generatePosee() {
-    // Génère un multiplicande de 2 ou 3 chiffres et un multiplicateur de 1 chiffre
-    const useThreeDigits = Math.random() > 0.5;
-    if (useThreeDigits) {
-        poseeState.a = Math.floor(Math.random() * 900) + 100; // 100-999
+    const diff = poseeState.difficulty;
+    if (diff === 'easy') {
+        poseeState.a = Math.floor(Math.random() * 90) + 10;   // 10-99
+        poseeState.b = Math.floor(Math.random() * 8) + 2;     // 2-9
+    } else if (diff === 'medium') {
+        poseeState.a = Math.floor(Math.random() * 90) + 10;   // 10-99
+        poseeState.b = Math.floor(Math.random() * 89) + 11;   // 11-99
     } else {
-        poseeState.a = Math.floor(Math.random() * 90) + 10; // 10-99
+        poseeState.a = Math.floor(Math.random() * 900) + 100; // 100-999
+        poseeState.b = Math.floor(Math.random() * 899) + 101; // 101-999
     }
-    poseeState.b = Math.floor(Math.random() * 8) + 2; // 2-9
     poseeState.validated = false;
 
     poseeEl.feedback.textContent = '';
@@ -305,28 +324,11 @@ function generatePosee() {
     renderPosee();
 }
 
-function renderPosee() {
-    const a = poseeState.a;
-    const b = poseeState.b;
-    const result = a * b;
-
-    const aStr = String(a);
-    const resultStr = String(result);
-    // La largeur de la grille = max(longueur du résultat, longueur de a + 1 pour le signe ×)
-    const maxLen = Math.max(resultStr.length, aStr.length + 1);
-
-    const grid = poseeEl.grid;
-    grid.textContent = '';
-    grid.style.setProperty('--posee-cols', maxLen);
-    const padA = maxLen - aStr.length;
-
-    // Ligne de retenues (inputs éditables au-dessus des chiffres du multiplicande)
-    // Positions valides : de max(0, padA-1) à padA+aStr.length-2
-    const carryStart = Math.max(0, padA - 1);
-    const carryEnd = padA + aStr.length - 2;
-    const carryRow = document.createElement('div');
-    carryRow.className = 'posee-row posee-carry-row';
-    carryRow.id = 'posee-carry-row';
+// Helpers pour créer les éléments de la grille
+function createCarryRow(maxLen, carryStart, carryEnd, groupIdx) {
+    const row = document.createElement('div');
+    row.className = 'posee-row posee-carry-row';
+    row.dataset.group = groupIdx;
     for (let i = 0; i < maxLen; i++) {
         const cell = document.createElement('div');
         cell.className = 'posee-cell posee-carry-cell';
@@ -338,145 +340,193 @@ function renderPosee() {
             input.className = 'posee-carry-input';
             input.autocomplete = 'off';
             input.dataset.col = i;
+            input.dataset.group = groupIdx;
             cell.appendChild(input);
         }
-        carryRow.appendChild(cell);
+        row.appendChild(cell);
     }
-    grid.appendChild(carryRow);
+    return row;
+}
 
-    // Ligne du multiplicande (aligné à droite)
-    const rowA = document.createElement('div');
-    rowA.className = 'posee-row';
+function createDigitRow(maxLen, numStr, padLeft, extraClass) {
+    const row = document.createElement('div');
+    row.className = 'posee-row' + (extraClass ? ' ' + extraClass : '');
     for (let i = 0; i < maxLen; i++) {
         const cell = document.createElement('div');
         cell.className = 'posee-cell';
-        if (i >= padA) {
-            cell.textContent = aStr[i - padA];
+        if (i >= padLeft && (i - padLeft) < numStr.length) {
+            cell.textContent = numStr[i - padLeft];
             cell.classList.add('posee-digit');
         }
-        rowA.appendChild(cell);
+        row.appendChild(cell);
     }
-    grid.appendChild(rowA);
+    return row;
+}
 
-    // Ligne du multiplicateur (avec signe × à gauche, aligné à droite)
+function createInputRow(maxLen, numStr, padLeft, inputClass, groupIdx, trailingZeros) {
+    const row = document.createElement('div');
+    row.className = 'posee-row posee-result-row';
+    row.dataset.group = groupIdx;
+    for (let i = 0; i < maxLen; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'posee-cell';
+        if (i >= padLeft) {
+            const pos = i - padLeft;
+            if (pos < numStr.length) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.inputMode = 'numeric';
+                input.maxLength = 1;
+                input.className = inputClass;
+                input.autocomplete = 'off';
+                input.dataset.pos = pos;
+                input.dataset.col = i;
+                input.dataset.group = groupIdx;
+                // Trailing zeros are pre-filled and read-only
+                if (trailingZeros && pos >= numStr.length - trailingZeros) {
+                    input.value = '0';
+                    input.readOnly = true;
+                    input.classList.add('posee-input-prefilled');
+                }
+                cell.appendChild(input);
+            }
+        }
+        row.appendChild(cell);
+    }
+    return row;
+}
+
+function setupInputNavigation(grid) {
+    const allInputs = Array.from(grid.querySelectorAll('input:not([readonly])'));
+
+    allInputs.forEach((inp, idx) => {
+        inp.addEventListener('input', () => {
+            inp.value = inp.value.replace(/[^0-9]/g, '').slice(-1);
+            // Auto-advance to previous (left) input in same row
+            if (inp.value) {
+                const sameGroup = allInputs.filter(i => i.dataset.group === inp.dataset.group && i.className === inp.className);
+                const idxInGroup = sameGroup.indexOf(inp);
+                if (idxInGroup > 0) sameGroup[idxInGroup - 1].focus();
+            }
+        });
+        inp.addEventListener('keydown', (e) => {
+            const sameGroup = allInputs.filter(i => i.dataset.group === inp.dataset.group && i.className === inp.className);
+            const idxInGroup = sameGroup.indexOf(inp);
+            if (e.key === 'Backspace' && !inp.value && idxInGroup > 0) {
+                sameGroup[idxInGroup - 1].focus();
+            }
+            if (e.key === 'ArrowLeft' && idxInGroup > 0) {
+                sameGroup[idxInGroup - 1].focus();
+            }
+            if (e.key === 'ArrowRight' && idxInGroup < sameGroup.length - 1) {
+                sameGroup[idxInGroup + 1].focus();
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (poseeState.validated) nextPosee();
+                else validatePosee();
+            }
+        });
+    });
+}
+
+function renderPosee() {
+    const a = poseeState.a;
+    const b = poseeState.b;
+    const bStr = String(b);
+    const aStr = String(a);
+    const result = a * b;
+    const resultStr = String(result);
+    const bDigits = bStr.split('').map(Number);
+    const isMultiDigit = bDigits.length > 1;
+
+    // Compute partial products
+    const partials = [];
+    for (let d = 0; d < bDigits.length; d++) {
+        const digit = bDigits[bDigits.length - 1 - d]; // from units to leftmost
+        const partial = a * digit;
+        const shiftedStr = String(partial) + '0'.repeat(d);
+        partials.push({ digit, partial, shifted: partial * Math.pow(10, d), shiftedStr, zeros: d });
+    }
+
+    // Grid width = max of all number widths
+    const allWidths = [aStr.length + 1, bStr.length + 1, resultStr.length];
+    partials.forEach(p => allWidths.push(p.shiftedStr.length));
+    const maxLen = Math.max(...allWidths);
+
+    const grid = poseeEl.grid;
+    grid.textContent = '';
+    grid.style.setProperty('--posee-cols', maxLen);
+
+    const padA = maxLen - aStr.length;
+    const padB = maxLen - bStr.length;
+
+    if (!isMultiDigit) {
+        // === FACILE : format identique à l'ancien (1 chiffre) ===
+        // Carry row
+        const carryStart = Math.max(0, padA - 1);
+        const carryEnd = padA + aStr.length - 2;
+        grid.appendChild(createCarryRow(maxLen, carryStart, carryEnd, 0));
+    }
+
+    // Multiplicande row
+    grid.appendChild(createDigitRow(maxLen, aStr, padA));
+
+    // Multiplicateur row (× sign + digits)
     const rowB = document.createElement('div');
     rowB.className = 'posee-row';
     for (let i = 0; i < maxLen; i++) {
         const cell = document.createElement('div');
         cell.className = 'posee-cell';
-        if (i === maxLen - 2) {
-            cell.textContent = '×';
+        if (i === padB - 1) {
+            cell.textContent = '\u00d7';
             cell.classList.add('posee-operator');
-        } else if (i === maxLen - 1) {
-            cell.textContent = String(b);
+        } else if (i >= padB) {
+            cell.textContent = bStr[i - padB];
             cell.classList.add('posee-digit');
         }
         rowB.appendChild(cell);
     }
     grid.appendChild(rowB);
 
-    // Ligne de séparation
-    const separator = document.createElement('div');
-    separator.className = 'posee-separator';
-    grid.appendChild(separator);
+    // Separator
+    const sep1 = document.createElement('div');
+    sep1.className = 'posee-separator';
+    grid.appendChild(sep1);
 
-    // Ligne du résultat (inputs)
-    const rowResult = document.createElement('div');
-    rowResult.className = 'posee-row posee-result-row';
-    const padResult = maxLen - resultStr.length;
-    for (let i = 0; i < maxLen; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'posee-cell';
-        if (i >= padResult) {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.inputMode = 'numeric';
-            input.maxLength = 1;
-            input.className = 'posee-input';
-            input.autocomplete = 'off';
-            input.dataset.pos = i - padResult;
-            input.dataset.col = i;
-            cell.appendChild(input);
-        }
-        rowResult.appendChild(cell);
-    }
-    grid.appendChild(rowResult);
+    if (!isMultiDigit) {
+        // === FACILE : une seule ligne de résultat ===
+        const padResult = maxLen - resultStr.length;
+        grid.appendChild(createInputRow(maxLen, resultStr, padResult, 'posee-input', 0, 0));
+    } else {
+        // === MOYEN / DIFFICILE : produits partiels + résultat final ===
+        partials.forEach((p, idx) => {
+            // Carry row for this partial product
+            const carryStart = Math.max(0, padA - 1);
+            const carryEnd = padA + aStr.length - 2;
+            grid.appendChild(createCarryRow(maxLen, carryStart, carryEnd, idx));
 
-    // Navigation entre les inputs
-    const resultInputs = grid.querySelectorAll('.posee-input');
-    const carryInputs = grid.querySelectorAll('.posee-carry-input');
+            // Partial product input row
+            const padPartial = maxLen - p.shiftedStr.length;
+            grid.appendChild(createInputRow(maxLen, p.shiftedStr, padPartial, 'posee-input posee-partial', idx, p.zeros));
+        });
 
-    // Helper : trouver un input carry/result par colonne
-    function findByCol(inputs, col) {
-        for (const inp of inputs) {
-            if (inp.dataset.col === String(col)) return inp;
-        }
-        return null;
+        // Final separator
+        const sep2 = document.createElement('div');
+        sep2.className = 'posee-separator';
+        grid.appendChild(sep2);
+
+        // Final result row
+        const padResult = maxLen - resultStr.length;
+        grid.appendChild(createInputRow(maxLen, resultStr, padResult, 'posee-input posee-final', 'final', 0));
     }
 
-    // Navigation résultat (droite à gauche + haut/bas vers retenues)
-    resultInputs.forEach((inp, idx) => {
-        inp.addEventListener('input', () => {
-            inp.value = inp.value.replace(/[^0-9]/g, '').slice(-1);
-            if (inp.value && idx > 0) {
-                resultInputs[idx - 1].focus();
-            }
-        });
-        inp.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !inp.value && idx > 0) {
-                resultInputs[idx - 1].focus();
-            }
-            if (e.key === 'ArrowLeft' && idx > 0) {
-                resultInputs[idx - 1].focus();
-            }
-            if (e.key === 'ArrowRight' && idx < resultInputs.length - 1) {
-                resultInputs[idx + 1].focus();
-            }
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                const carry = findByCol(carryInputs, inp.dataset.col);
-                if (carry) carry.focus();
-            }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (poseeState.validated) nextPosee();
-                else validatePosee();
-            }
-        });
-    });
+    setupInputNavigation(grid);
 
-    // Navigation retenues (gauche/droite + bas vers résultat)
-    const carryArr = Array.from(carryInputs);
-    carryArr.forEach((inp, idx) => {
-        inp.addEventListener('input', () => {
-            inp.value = inp.value.replace(/[^0-9]/g, '').slice(-1);
-        });
-        inp.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !inp.value && idx > 0) {
-                carryArr[idx - 1].focus();
-            }
-            if (e.key === 'ArrowLeft' && idx > 0) {
-                carryArr[idx - 1].focus();
-            }
-            if (e.key === 'ArrowRight' && idx < carryArr.length - 1) {
-                carryArr[idx + 1].focus();
-            }
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                const result = findByCol(resultInputs, inp.dataset.col);
-                if (result) result.focus();
-            }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (poseeState.validated) nextPosee();
-                else validatePosee();
-            }
-        });
-    });
-
-    // Focus sur le dernier input résultat (unités, à droite)
-    if (resultInputs.length > 0) {
-        resultInputs[resultInputs.length - 1].focus();
+    // Focus on last editable input of first input row
+    const firstRowInputs = grid.querySelectorAll('[data-group="0"].posee-input:not([readonly])');
+    if (firstRowInputs.length > 0) {
+        firstRowInputs[firstRowInputs.length - 1].focus();
     }
 }
 
@@ -487,37 +537,21 @@ function validatePosee() {
     const b = poseeState.b;
     const result = a * b;
     const resultStr = String(result);
+    const bStr = String(b);
+    const bDigits = bStr.split('').map(Number);
+    const isMultiDigit = bDigits.length > 1;
     const grid = poseeEl.grid;
-    const inputs = grid.querySelectorAll('.posee-input');
 
-    // Récupérer la réponse de l'élève (chaque input = 1 chiffre du résultat)
-    let userAnswer = '';
-    inputs.forEach(inp => {
-        userAnswer += inp.value || '';
-    });
+    let allCorrect = true;
 
-    const isCorrect = userAnswer === resultStr;
+    if (!isMultiDigit) {
+        // Facile : validate single result row
+        const inputs = grid.querySelectorAll('.posee-input');
+        let userAnswer = '';
+        inputs.forEach(inp => { userAnswer += inp.value || ''; });
+        const correct = userAnswer === resultStr;
+        if (!correct) allCorrect = false;
 
-    poseeState.validated = true;
-    poseeState.history.push({ a, b, result, userAnswer: userAnswer.trim(), isCorrect });
-
-    if (isCorrect) {
-        poseeState.correctCount++;
-        poseeEl.correctCount.textContent = poseeState.correctCount;
-        poseeEl.feedback.textContent = 'Bravo ! 🎉';
-        poseeEl.feedback.className = 'feedback correct';
-        inputs.forEach(inp => {
-            inp.classList.add('posee-input-correct');
-            inp.readOnly = true;
-        });
-        validateCarries();
-    } else {
-        poseeState.wrongCount++;
-        poseeEl.wrongCount.textContent = poseeState.wrongCount;
-        poseeEl.feedback.textContent = `La bonne réponse est ${a} × ${b} = ${result}`;
-        poseeEl.feedback.className = 'feedback wrong';
-
-        // Colorier chaque chiffre : vert si correct, rouge sinon
         inputs.forEach((inp, idx) => {
             inp.readOnly = true;
             if (inp.value === resultStr[idx]) {
@@ -526,11 +560,65 @@ function validatePosee() {
                 inp.classList.add('posee-input-wrong');
             }
         });
+    } else {
+        // Moyen/Difficile : validate each partial + final
+        const partials = [];
+        for (let d = 0; d < bDigits.length; d++) {
+            const digit = bDigits[bDigits.length - 1 - d];
+            const partial = a * digit;
+            const shiftedStr = String(partial) + '0'.repeat(d);
+            partials.push(shiftedStr);
+        }
 
-        // Afficher les retenues
-        validateCarries();
+        // Validate each partial product
+        partials.forEach((expected, idx) => {
+            const inputs = grid.querySelectorAll(`.posee-partial[data-group="${idx}"]`);
+            let userVal = '';
+            inputs.forEach(inp => { userVal += inp.value || ''; });
+            if (userVal !== expected) allCorrect = false;
+
+            inputs.forEach((inp, i) => {
+                inp.readOnly = true;
+                if (inp.value === expected[i]) {
+                    inp.classList.add('posee-input-correct');
+                } else if (!inp.classList.contains('posee-input-prefilled')) {
+                    inp.classList.add('posee-input-wrong');
+                }
+            });
+        });
+
+        // Validate final result
+        const finalInputs = grid.querySelectorAll('.posee-final');
+        let userFinal = '';
+        finalInputs.forEach(inp => { userFinal += inp.value || ''; });
+        if (userFinal !== resultStr) allCorrect = false;
+
+        finalInputs.forEach((inp, idx) => {
+            inp.readOnly = true;
+            if (inp.value === resultStr[idx]) {
+                inp.classList.add('posee-input-correct');
+            } else {
+                inp.classList.add('posee-input-wrong');
+            }
+        });
     }
 
+    poseeState.validated = true;
+    poseeState.history.push({ a, b, result, isCorrect: allCorrect });
+
+    if (allCorrect) {
+        poseeState.correctCount++;
+        poseeEl.correctCount.textContent = poseeState.correctCount;
+        poseeEl.feedback.textContent = 'Bravo ! \uD83C\uDF89';
+        poseeEl.feedback.className = 'feedback correct';
+    } else {
+        poseeState.wrongCount++;
+        poseeEl.wrongCount.textContent = poseeState.wrongCount;
+        poseeEl.feedback.textContent = `La bonne r\u00e9ponse est ${a} \u00d7 ${b} = ${result}`;
+        poseeEl.feedback.className = 'feedback wrong';
+    }
+
+    validateCarries();
     poseeEl.btnValidate.style.display = 'none';
     poseeEl.btnNext.style.display = '';
     poseeEl.btnNext.focus();
@@ -540,47 +628,50 @@ function validateCarries() {
     const a = poseeState.a;
     const b = poseeState.b;
     const aStr = String(a);
+    const bStr = String(b);
+    const bDigits = bStr.split('').map(Number);
     const maxLen = parseInt(poseeEl.grid.style.getPropertyValue('--posee-cols'));
-
-    const carryInputs = poseeEl.grid.querySelectorAll('.posee-carry-input');
     const padA = maxLen - aStr.length;
 
-    // Calculer les retenues attendues par colonne
-    const expectedCarries = {};
-    let carry = 0;
-    for (let i = aStr.length - 1; i >= 0; i--) {
-        const digit = parseInt(aStr[i]);
-        const product = digit * b + carry;
-        carry = Math.floor(product / 10);
-        if (carry > 0) {
-            const col = padA + i - 1;
-            if (col >= 0) expectedCarries[col] = carry;
+    // For each group, compute expected carries
+    const groups = bDigits.length > 1 ? bDigits.length : 1;
+    for (let g = 0; g < groups; g++) {
+        const digit = bDigits.length > 1 ? bDigits[bDigits.length - 1 - g] : b;
+        const carryInputs = poseeEl.grid.querySelectorAll(`.posee-carry-input[data-group="${g}"]`);
+
+        const expectedCarries = {};
+        let carry = 0;
+        for (let i = aStr.length - 1; i >= 0; i--) {
+            const d = parseInt(aStr[i]);
+            const product = d * digit + carry;
+            carry = Math.floor(product / 10);
+            if (carry > 0) {
+                const col = padA + i - 1;
+                if (col >= 0) expectedCarries[col] = carry;
+            }
         }
-    }
 
-    // Valider chaque input retenue
-    carryInputs.forEach(inp => {
-        inp.readOnly = true;
-        const col = parseInt(inp.dataset.col);
-        const expected = expectedCarries[col];
-        const userVal = inp.value.trim();
+        carryInputs.forEach(inp => {
+            inp.readOnly = true;
+            const col = parseInt(inp.dataset.col);
+            const expected = expectedCarries[col];
+            const userVal = inp.value.trim();
 
-        if (expected) {
-            // Une retenue est attendue ici
-            if (userVal === String(expected)) {
-                inp.classList.add('posee-carry-correct');
+            if (expected) {
+                if (userVal === String(expected)) {
+                    inp.classList.add('posee-carry-correct');
+                } else {
+                    inp.value = expected;
+                    inp.classList.add('posee-carry-shown');
+                }
             } else {
-                inp.value = expected;
-                inp.classList.add('posee-carry-shown');
+                if (userVal && userVal !== '0') {
+                    inp.value = '';
+                    inp.classList.add('posee-carry-wrong');
+                }
             }
-        } else {
-            // Pas de retenue attendue
-            if (userVal && userVal !== '0') {
-                inp.value = '';
-                inp.classList.add('posee-carry-wrong');
-            }
-        }
-    });
+        });
+    }
 }
 
 function nextPosee() {

@@ -1248,6 +1248,39 @@ body::after {
     background: linear-gradient(135deg, #f0fff4, #e8f5e9) !important;
 }
 
+/* Difficulty buttons */
+.difficulty-easy {
+    border-color: var(--success) !important;
+    background: linear-gradient(135deg, #f0fff4, #e8f5e9) !important;
+}
+
+.difficulty-medium {
+    border-color: var(--warning) !important;
+    background: linear-gradient(135deg, #fff8f0, #fef3e2) !important;
+}
+
+.difficulty-hard {
+    border-color: var(--purple) !important;
+    background: linear-gradient(135deg, #f8f0ff, #f0e6ff) !important;
+}
+
+/* Partial product rows */
+.posee-partial-label {
+    width: 100%;
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-top: 0.25rem;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.posee-input-prefilled {
+    background: #f0f0f0 !important;
+    color: var(--text-light) !important;
+    border-color: #dee2e6 !important;
+    cursor: default;
+}
+
 /* Results card for posee */
 .posee-results-card {
     background: var(--card-bg);
