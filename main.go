@@ -25,18 +25,18 @@ type Question struct {
 }
 
 type Player struct {
-	Name  string `json:"name"`
-	Score int    `json:"score"`
-	conn  *websocket.Conn
-	writeMu sync.Mutex
+	Name     string `json:"name"`
+	Score    int    `json:"score"`
+	conn     *websocket.Conn
+	writeMu  sync.Mutex
+	question Question
 }
 
 type Room struct {
-	ID       string
-	Players  [2]*Player
-	mu       sync.Mutex
-	started  bool
-	question Question
+	ID      string
+	Players [2]*Player
+	mu      sync.Mutex
+	started bool
 }
 
 type Message struct {
@@ -194,25 +194,27 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 		rooms[conn] = room
 		waitingRoom = nil
 
-		// Generate first question
-		room.question = generateQuestion()
+		// Generate first question (same for both players)
+		firstQuestion := generateQuestion()
 		room.started = true
 
 		// Notify both players
 		p0 := room.Players[0]
 		p1 := room.Players[1]
+		p0.question = firstQuestion
+		p1.question = firstQuestion
 
 		startMsg0 := StartMsg{
 			Type:     "start",
 			You:      p0.Name,
 			Opponent: p1.Name,
-			Question: room.question,
+			Question: firstQuestion,
 		}
 		startMsg1 := StartMsg{
 			Type:     "start",
 			You:      p1.Name,
 			Opponent: p0.Name,
-			Question: room.question,
+			Question: firstQuestion,
 		}
 
 		log.Printf("[JOIN] %s joins %s's room, sending start to both", p1.Name, p0.Name)
@@ -240,8 +242,8 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
-	correct := answerData.Answer == room.question.Answer
-	correctAnswer := room.question.Answer
+	correct := answerData.Answer == player.question.Answer
+	correctAnswer := player.question.Answer
 
 	if correct {
 		player.Score++
@@ -260,9 +262,9 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 		opponent = room.Players[0]
 	}
 
-	// Generate new question for this player
+	// Generate new question for this player only
 	newQuestion := generateQuestion()
-	room.question = newQuestion
+	player.question = newQuestion
 
 	// Send score update to the answering player
 	sendJSON(player, ScoreUpdateMsg{
