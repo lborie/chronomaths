@@ -107,10 +107,16 @@ const winScore = 20
 const penaltyPoints = 3
 
 func generateQuestion(operation string) Question {
-	if operation == "addition" {
+	switch operation {
+	case "addition":
 		return generateAdditionQuestion()
+	case "subtraction":
+		return generateSubtractionQuestion()
+	case "division":
+		return generateDivisionQuestion()
+	default:
+		return generateMultiplicationQuestion()
 	}
-	return generateMultiplicationQuestion()
 }
 
 func generateMultiplicationQuestion() Question {
@@ -135,6 +141,35 @@ func generateAdditionQuestion() Question {
 		b = rand.Intn(50) + 50
 	}
 	return Question{A: a, B: b, Answer: a + b}
+}
+
+func generateSubtractionQuestion() Question {
+	r := rand.Intn(100)
+	var a, b int
+	switch {
+	case r < 20:
+		b = rand.Intn(9) + 2
+		result := rand.Intn(10) + 1
+		a = result + b
+	case r < 70:
+		a = rand.Intn(80) + 20
+		maxB := a - 1
+		if maxB > 50 {
+			maxB = 50
+		}
+		b = rand.Intn(maxB-1) + 2
+	default:
+		a = rand.Intn(50) + 50
+		b = rand.Intn(a-20) + 20
+	}
+	return Question{A: a, B: b, Answer: a - b}
+}
+
+func generateDivisionQuestion() Question {
+	tables := []int{2, 3, 4, 5, 6, 7, 8, 9, 10}
+	divisor := tables[rand.Intn(len(tables))]
+	quotient := tables[rand.Intn(len(tables))]
+	return Question{A: divisor * quotient, B: divisor, Answer: quotient}
 }
 
 func sendJSON(p *Player, v interface{}) {
@@ -204,7 +239,7 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 	players[conn] = player
 
 	operation := joinData.Operation
-	if operation != "addition" {
+	if operation != "addition" && operation != "subtraction" && operation != "division" {
 		operation = "multiplication"
 	}
 

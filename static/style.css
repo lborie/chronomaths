@@ -233,6 +233,14 @@ body::after {
     animation-delay: 0.1s;
 }
 
+.operation-card:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.operation-card:nth-child(4) {
+    animation-delay: 0.3s;
+}
+
 .operation-card:active {
     transform: scale(0.95);
 }
@@ -262,6 +270,30 @@ body::after {
 
 .op-add .operation-symbol {
     background: linear-gradient(135deg, var(--success), #1abc9c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.op-subtract {
+    border-color: var(--secondary);
+    background: linear-gradient(135deg, #f0faff, #e0f0ff);
+}
+
+.op-subtract .operation-symbol {
+    background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.op-divide {
+    border-color: var(--purple);
+    background: linear-gradient(135deg, #f8f0ff, #f0e6ff);
+}
+
+.op-divide .operation-symbol {
+    background: linear-gradient(135deg, var(--purple), #8e44ad);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -1737,6 +1769,18 @@ body::after {
         transform: scale(1.03);
         box-shadow: 0 12px 30px rgba(46, 213, 115, 0.3);
         border-color: #1abc9c;
+    }
+
+    .op-subtract:hover {
+        transform: scale(1.03);
+        box-shadow: 0 12px 30px rgba(72, 219, 251, 0.3);
+        border-color: var(--secondary-dark);
+    }
+
+    .op-divide:hover {
+        transform: scale(1.03);
+        box-shadow: 0 12px 30px rgba(165, 94, 234, 0.3);
+        border-color: #8e44ad;
     }
 
     .table-practice-btn:hover {

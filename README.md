@@ -1,22 +1,24 @@
 # 🧮 Chronomaths
 
-Application web ludique pour apprendre les multiplications et les additions, destinée aux élèves de CE2.
+Application web ludique pour apprendre les 4 opérations (additions, soustractions, multiplications, divisions), destinée aux élèves de CE2.
 
 ## Aperçu
 
-Chronomaths propose des sessions chronométrées de calcul mental où l'enfant doit résoudre des multiplications ou des additions contre la montre. L'interface colorée et les animations rendent l'apprentissage amusant et motivant.
+Chronomaths propose des sessions chronométrées de calcul mental où l'enfant doit résoudre des additions, soustractions, multiplications ou divisions contre la montre. L'interface colorée et les animations rendent l'apprentissage amusant et motivant.
 
 ## Fonctionnalités
 
 ### Choix de l'opération
 
 L'enfant commence par choisir l'opération qu'il souhaite travailler :
-- **Multiplications** (×) — Tables de 2 à 10
 - **Additions** (+) — Calcul mental avec difficulté mixte
+- **Soustractions** (−) — Calcul mental, résultat toujours positif
+- **Multiplications** (×) — Tables de 2 à 10
+- **Divisions** (÷) — Tables de 2 à 10, résultat exact
 
 ### Modes de jeu
 
-Tous les modes sont disponibles pour les deux opérations.
+Tous les modes sont disponibles pour les quatre opérations (sauf opérations posées, non disponibles pour la division).
 
 | Mode | Durée | Calculs | Difficulté |
 |------|-------|---------|------------|
@@ -29,7 +31,7 @@ Tous les modes sont disponibles pour les deux opérations.
 
 ### Déroulement d'une partie
 
-1. **Choix de l'opération** : Multiplications ou Additions
+1. **Choix de l'opération** : Additions, Soustractions, Multiplications ou Divisions
 2. **Choix du mode** : L'enfant sélectionne son défi (ou une table/nombre spécifique en mode Révision)
 3. **Calculs** : Les opérations s'affichent une par une
 4. **Feedback immédiat** : Chaque réponse est validée avec un retour visuel
@@ -98,7 +100,7 @@ Le serveur gère les fichiers statiques et le mode multijoueur via WebSocket :
 - `embed.FS` pour embarquer les fichiers statiques dans le binaire
 - `http.FileServer` pour servir les fichiers
 - WebSocket (`gorilla/websocket`) pour le multijoueur temps réel
-- Support des deux opérations (multiplication et addition) côté serveur
+- Support des quatre opérations (addition, soustraction, multiplication, division) côté serveur
 - Port par défaut : 8080
 
 ```go
@@ -114,12 +116,14 @@ var staticFiles embed.FS
 |---------|------|
 | `index.html` | Écrans : accueil, modes, jeu, résultats, posée, multi |
 | `style.css` | Variables CSS, responsive, animations |
-| `app.js` | Machine à états, génération questions (× et +), timer |
+| `app.js` | Machine à états, génération questions (+, −, ×, ÷), timer |
 
 #### Génération des questions
 
-- **Multiplications** : générées aléatoirement parmi les tables de 2 à 10 (81 combinaisons). Mélange Fisher-Yates.
 - **Additions** : difficulté mixte — 20% facile (2-20 + 2-20), 50% moyen (10-99 + 2-50), 30% difficile (50-99 + 50-99).
+- **Soustractions** : difficulté mixte, résultat toujours positif — 20% facile, 50% moyen, 30% difficile.
+- **Multiplications** : générées aléatoirement parmi les tables de 2 à 10 (81 combinaisons). Mélange Fisher-Yates.
+- **Divisions** : basées sur les tables de multiplication inversées (résultat toujours exact, sans reste).
 
 #### Gestion du temps
 

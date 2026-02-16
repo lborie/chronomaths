@@ -19,15 +19,25 @@
 
             <div class="mode-selection">
                 <div class="operation-choice">
+                    <button class="operation-card op-add" data-operation="addition">
+                        <span class="operation-symbol">+</span>
+                        <span class="operation-name">Additions</span>
+                        <span class="operation-desc">Calcul mental</span>
+                    </button>
+                    <button class="operation-card op-subtract" data-operation="subtraction">
+                        <span class="operation-symbol">−</span>
+                        <span class="operation-name">Soustractions</span>
+                        <span class="operation-desc">Calcul mental</span>
+                    </button>
                     <button class="operation-card op-multiply" data-operation="multiplication">
                         <span class="operation-symbol">×</span>
                         <span class="operation-name">Multiplications</span>
                         <span class="operation-desc">Tables de 2 à 10</span>
                     </button>
-                    <button class="operation-card op-add" data-operation="addition">
-                        <span class="operation-symbol">+</span>
-                        <span class="operation-name">Additions</span>
-                        <span class="operation-desc">Calcul mental</span>
+                    <button class="operation-card op-divide" data-operation="division">
+                        <span class="operation-symbol">÷</span>
+                        <span class="operation-name">Divisions</span>
+                        <span class="operation-desc">Tables de 2 à 10</span>
                     </button>
                 </div>
             </div>
@@ -64,18 +74,20 @@
                     </button>
                 </div>
 
-                <div class="multi-separator">
-                    <span>ou</span>
-                </div>
+                <div id="posee-section">
+                    <div class="multi-separator">
+                        <span>ou</span>
+                    </div>
 
-                <button id="btn-posee" class="multi-btn posee-btn">
-                    <span class="multi-icon">📝</span>
-                    <span class="multi-text">
-                        <span id="posee-btn-title" class="multi-title">Multiplications posées</span>
-                        <span id="posee-btn-desc" class="multi-details">Apprends à poser les multiplications avec retenue</span>
-                    </span>
-                    <span class="multi-arrow">→</span>
-                </button>
+                    <button id="btn-posee" class="multi-btn posee-btn">
+                        <span class="multi-icon">📝</span>
+                        <span class="multi-text">
+                            <span id="posee-btn-title" class="multi-title">Multiplications posées</span>
+                            <span id="posee-btn-desc" class="multi-details">Apprends à poser les multiplications avec retenue</span>
+                        </span>
+                        <span class="multi-arrow">→</span>
+                    </button>
+                </div>
 
                 <div class="multi-separator">
                     <span>ou</span>
