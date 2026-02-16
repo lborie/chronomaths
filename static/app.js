@@ -135,7 +135,10 @@ function generateQuestions(count) {
 function generateTableQuestions(tables, count) {
     const factors = [2, 3, 4, 5, 6, 7, 8, 9, 10];
     const combinations = [];
-    tables.forEach(t => factors.forEach(f => combinations.push({ a: t, b: f, answer: t * f })));
+    tables.forEach(t => factors.forEach(f => {
+        combinations.push({ a: t, b: f, answer: t * f });
+        if (t !== f) combinations.push({ a: f, b: t, answer: t * f });
+    }));
     shuffleArray(combinations);
 
     const questions = [];
@@ -151,7 +154,10 @@ function generateTableQuestions(tables, count) {
 function generateNumberQuestions(numbers, count) {
     const addends = [2, 3, 4, 5, 6, 7, 8, 9];
     const combinations = [];
-    numbers.forEach(n => addends.forEach(b => combinations.push({ a: n, b, answer: n + b })));
+    numbers.forEach(n => addends.forEach(b => {
+        combinations.push({ a: n, b, answer: n + b });
+        if (n !== b) combinations.push({ a: b, b: n, answer: n + b });
+    }));
     shuffleArray(combinations);
 
     const questions = [];
