@@ -297,10 +297,11 @@ function cleanupScreen(screenName) {
         case 'multiWaiting':
         case 'multiRace':
         case 'multiWin':
-            if (multi.ws) {
-                multi.ws.close();
-                multi.ws = null;
+            if (multi.eventSource) {
+                multi.eventSource.close();
+                multi.eventSource = null;
             }
+            multi.playerId = null;
             break;
     }
 }
@@ -1354,7 +1355,8 @@ poseeEl.btnReplay.addEventListener('click', () => {
 const WIN_SCORE = 20;
 
 const multi = {
-    ws: null,
+    eventSource: null,
+    playerId: null,
     playerName: '',
     opponentName: '',
     myScore: 0,
@@ -1395,10 +1397,11 @@ multiEl.btnMulti.addEventListener('click', () => {
 });
 
 multiEl.btnBackHome.addEventListener('click', () => {
-    if (multi.ws) {
-        multi.ws.close();
-        multi.ws = null;
+    if (multi.eventSource) {
+        multi.eventSource.close();
+        multi.eventSource = null;
     }
+    multi.playerId = null;
     showScreen('modes');
 });
 
@@ -1410,7 +1413,7 @@ function joinGame() {
     multi.myScore = 0;
     multi.opponentScore = 0;
 
-    connectWebSocket(name);
+    connectSSE(name);
 }
 
 document.getElementById('btn-join').addEventListener('click', joinGame);
@@ -1420,73 +1423,82 @@ multiEl.playerName.addEventListener('keydown', (e) => {
 
 const waitingStatusEl = document.getElementById('waiting-status');
 
-function connectWebSocket(name) {
-    if (multi.ws) {
-        multi.ws.onclose = null;
-        multi.ws.close();
-        multi.ws = null;
+async function connectSSE(name) {
+    if (multi.eventSource) {
+        multi.eventSource.close();
+        multi.eventSource = null;
     }
 
     multiEl.waitingName.textContent = name;
     waitingStatusEl.textContent = 'Connexion...';
     showScreen('multiWaiting');
 
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${location.host}/ws`;
-    const ws = new WebSocket(wsUrl);
-    multi.ws = ws;
+    try {
+        const res = await fetch('/api/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, operation: config.operation })
+        });
 
-    ws.onopen = () => {
-        waitingStatusEl.textContent = '';
-        ws.send(JSON.stringify({ type: 'join', data: { name, operation: config.operation } }));
-    };
+        if (!res.ok) {
+            waitingStatusEl.textContent = 'Erreur de connexion';
+            return;
+        }
 
-    ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        handleServerMessage(msg);
-    };
+        const { playerId } = await res.json();
+        multi.playerId = playerId;
 
-    ws.onerror = () => {
-        waitingStatusEl.textContent = 'Erreur de connexion';
-    };
+        const es = new EventSource(`/api/events?playerId=${playerId}`);
+        multi.eventSource = es;
 
-    ws.onclose = () => {
-        multi.ws = null;
-    };
-}
-
-function handleServerMessage(msg) {
-    switch (msg.type) {
-        case 'waiting':
+        es.addEventListener('waiting', (e) => {
             multiEl.waitingName.textContent = multi.playerName;
+            waitingStatusEl.textContent = '';
             showScreen('multiWaiting');
-            break;
+        });
 
-        case 'start':
+        es.addEventListener('start', (e) => {
+            const msg = JSON.parse(e.data);
             multi.opponentName = msg.opponent;
             multi.myScore = 0;
             multi.opponentScore = 0;
             startMultiRace(msg);
-            break;
+        });
 
-        case 'scoreUpdate':
+        es.addEventListener('scoreUpdate', (e) => {
+            const msg = JSON.parse(e.data);
             multi.myScore = msg.yourScore;
             multi.opponentScore = msg.opponentScore;
             handleScoreUpdate(msg);
-            break;
+        });
 
-        case 'opponentScore':
+        es.addEventListener('opponentScore', (e) => {
+            const msg = JSON.parse(e.data);
             multi.opponentScore = msg.opponentScore;
             updateRaceTrack();
-            break;
+        });
 
-        case 'win':
+        es.addEventListener('win', (e) => {
+            const msg = JSON.parse(e.data);
             showWinScreen(msg.winner);
-            break;
+        });
 
-        case 'opponentLeft':
+        es.addEventListener('opponentLeft', () => {
             showOpponentLeft();
-            break;
+        });
+
+        es.onerror = () => {
+            if (es.readyState === EventSource.CLOSED) {
+                multi.eventSource = null;
+                multi.playerId = null;
+                const screen = getActiveScreen();
+                if (screen === 'multiRace') {
+                    showOpponentLeft();
+                }
+            }
+        };
+    } catch (err) {
+        waitingStatusEl.textContent = 'Erreur de connexion';
     }
 }
 
@@ -1597,15 +1609,23 @@ function showOpponentLeft() {
 multiEl.multiAnswerForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const answer = parseInt(multiEl.multiAnswerInput.value);
-    if (isNaN(answer) || !multi.ws) return;
+    if (isNaN(answer) || !multi.playerId) return;
 
-    multi.ws.send(JSON.stringify({ type: 'answer', data: { answer } }));
+    fetch('/api/answer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Player-ID': multi.playerId
+        },
+        body: JSON.stringify({ answer })
+    });
 });
 
 multiEl.btnPlayAgainMulti.addEventListener('click', () => {
-    if (multi.ws) {
-        multi.ws.close();
-        multi.ws = null;
+    if (multi.eventSource) {
+        multi.eventSource.close();
+        multi.eventSource = null;
     }
+    multi.playerId = null;
     showScreen('modes');
 });

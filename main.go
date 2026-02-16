@@ -1,16 +1,18 @@
 package main
 
 import (
+	crand "crypto/rand"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"math/rand"
 	"net/http"
 	"sync"
-
-	"github.com/gorilla/websocket"
+	"time"
 )
 
 //go:embed static/*
@@ -25,11 +27,13 @@ type Question struct {
 }
 
 type Player struct {
-	Name     string `json:"name"`
-	Score    int    `json:"score"`
-	conn     *websocket.Conn
-	writeMu  sync.Mutex
-	question Question
+	ID           string
+	Name         string
+	Score        int
+	events       chan []byte
+	done         chan struct{}
+	sseConnected bool
+	question     Question
 }
 
 type Room struct {
@@ -38,11 +42,6 @@ type Room struct {
 	Players   [2]*Player
 	mu        sync.Mutex
 	started   bool
-}
-
-type Message struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
 }
 
 type JoinData struct {
@@ -54,57 +53,55 @@ type AnswerData struct {
 	Answer int `json:"answer"`
 }
 
-// Outgoing messages
+// Outgoing messages (type is conveyed via SSE event name, not in JSON)
 
 type WaitingMsg struct {
-	Type string `json:"type"`
 	Name string `json:"name"`
 }
 
 type StartMsg struct {
-	Type     string   `json:"type"`
 	You      string   `json:"you"`
 	Opponent string   `json:"opponent"`
 	Question Question `json:"question"`
 }
 
 type ScoreUpdateMsg struct {
-	Type          string `json:"type"`
-	YourScore     int    `json:"yourScore"`
-	OpponentScore int    `json:"opponentScore"`
-	Correct       bool   `json:"correct"`
-	CorrectAnswer int    `json:"correctAnswer"`
+	YourScore     int      `json:"yourScore"`
+	OpponentScore int      `json:"opponentScore"`
+	Correct       bool     `json:"correct"`
+	CorrectAnswer int      `json:"correctAnswer"`
 	Question      Question `json:"question"`
 }
 
 type OpponentScoreMsg struct {
-	Type          string `json:"type"`
-	OpponentScore int    `json:"opponentScore"`
+	OpponentScore int `json:"opponentScore"`
 }
 
 type WinMsg struct {
-	Type   string `json:"type"`
 	Winner string `json:"winner"`
-}
-
-type OpponentLeftMsg struct {
-	Type string `json:"type"`
 }
 
 // --- Globals ---
 
 var (
-	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
-	}
-	waitingRoom *Room
-	rooms       = make(map[*websocket.Conn]*Room)
-	players     = make(map[*websocket.Conn]*Player)
-	globalMu    sync.Mutex
+	waitingRooms = make(map[string]*Room) // operation -> waiting room
+	rooms        = make(map[string]*Room)
+	players      = make(map[string]*Player)
+	globalMu     sync.Mutex
 )
 
 const winScore = 20
 const penaltyPoints = 3
+
+// --- Player ID ---
+
+func generatePlayerID() string {
+	b := make([]byte, 8)
+	crand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// --- Question generation ---
 
 func generateQuestion(operation string) Question {
 	switch operation {
@@ -130,13 +127,13 @@ func generateAdditionQuestion() Question {
 	r := rand.Intn(100)
 	var a, b int
 	switch {
-	case r < 20: // easy
+	case r < 20:
 		a = rand.Intn(19) + 2
 		b = rand.Intn(19) + 2
-	case r < 70: // medium
+	case r < 70:
 		a = rand.Intn(90) + 10
 		b = rand.Intn(49) + 2
-	default: // hard
+	default:
 		a = rand.Intn(50) + 50
 		b = rand.Intn(50) + 50
 	}
@@ -172,137 +169,137 @@ func generateDivisionQuestion() Question {
 	return Question{A: divisor * quotient, B: divisor, Answer: quotient}
 }
 
-func sendJSON(p *Player, v interface{}) {
-	data, err := json.Marshal(v)
+// --- SSE helpers ---
+
+func sendEvent(p *Player, eventType string, data interface{}) {
+	payload, err := json.Marshal(data)
 	if err != nil {
 		log.Println("marshal error:", err)
 		return
 	}
-	p.writeMu.Lock()
-	defer p.writeMu.Unlock()
-	if err := p.conn.WriteMessage(websocket.TextMessage, data); err != nil {
-		log.Println("write error:", err)
+	msg := fmt.Sprintf("event: %s\ndata: %s\n\n", eventType, payload)
+	select {
+	case p.events <- []byte(msg):
+	case <-p.done:
+	default:
+		log.Printf("[SSE] dropping message for %s, channel full", p.Name)
 	}
 }
 
-func handleWS(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[WS] upgrade request from %s (User-Agent: %s)", r.RemoteAddr, r.UserAgent())
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("[WS] upgrade FAILED from %s: %v", r.RemoteAddr, err)
+// --- HTTP Handlers ---
+
+func handleJoinHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	log.Printf("[WS] upgrade OK from %s", r.RemoteAddr)
-	defer func() {
-		handleDisconnect(conn)
-		conn.Close()
-	}()
 
-	for {
-		_, msgBytes, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-
-		var msg Message
-		if err := json.Unmarshal(msgBytes, &msg); err != nil {
-			continue
-		}
-
-		switch msg.Type {
-		case "join":
-			handleJoin(conn, msg.Data)
-		case "answer":
-			handleAnswer(conn, msg.Data)
-		}
-	}
-}
-
-func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 	var joinData JoinData
-	if err := json.Unmarshal(data, &joinData); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&joinData); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
 	if joinData.Name == "" {
 		joinData.Name = "Joueur"
 	}
-
-	player := &Player{
-		Name: joinData.Name,
-		Score: 0,
-		conn: conn,
+	if len(joinData.Name) > 15 {
+		joinData.Name = joinData.Name[:15]
 	}
 
-	globalMu.Lock()
-	defer globalMu.Unlock()
-
-	players[conn] = player
+	playerID := generatePlayerID()
+	player := &Player{
+		ID:     playerID,
+		Name:   joinData.Name,
+		Score:  0,
+		events: make(chan []byte, 16),
+		done:   make(chan struct{}),
+	}
 
 	operation := joinData.Operation
 	if operation != "addition" && operation != "subtraction" && operation != "division" {
 		operation = "multiplication"
 	}
 
-	if waitingRoom == nil {
-		// Create a new room, this player waits
-		waitingRoom = &Room{
+	globalMu.Lock()
+	players[playerID] = player
+
+	if waitingRooms[operation] == nil {
+		waitingRooms[operation] = &Room{
 			ID:        fmt.Sprintf("room-%d", rand.Intn(100000)),
 			Operation: operation,
 		}
-		waitingRoom.Players[0] = player
-		rooms[conn] = waitingRoom
+		waitingRooms[operation].Players[0] = player
+		rooms[playerID] = waitingRooms[operation]
+		globalMu.Unlock()
 
-		log.Printf("[JOIN] %s creates room (%s), sending waiting", player.Name, operation)
-		sendJSON(player, WaitingMsg{Type: "waiting", Name: player.Name})
+		sendEvent(player, "waiting", WaitingMsg{Name: player.Name})
+		log.Printf("[JOIN] %s creates room (%s)", player.Name, operation)
 	} else {
-		// Second player joins, start the game
-		room := waitingRoom
+		room := waitingRooms[operation]
 		room.Players[1] = player
-		rooms[conn] = room
-		waitingRoom = nil
+		rooms[playerID] = room
+		delete(waitingRooms, operation)
 
-		// Generate first question (same for both players)
 		firstQuestion := generateQuestion(room.Operation)
 		room.started = true
 
-		// Notify both players
 		p0 := room.Players[0]
 		p1 := room.Players[1]
 		p0.question = firstQuestion
 		p1.question = firstQuestion
+		globalMu.Unlock()
 
-		startMsg0 := StartMsg{
-			Type:     "start",
-			You:      p0.Name,
-			Opponent: p1.Name,
-			Question: firstQuestion,
-		}
-		startMsg1 := StartMsg{
-			Type:     "start",
-			You:      p1.Name,
-			Opponent: p0.Name,
-			Question: firstQuestion,
-		}
-
-		log.Printf("[JOIN] %s joins %s's room, sending start to both", p1.Name, p0.Name)
-		sendJSON(p0, startMsg0)
-		sendJSON(p1, startMsg1)
-		log.Printf("[JOIN] start messages sent to both players")
+		sendEvent(p0, "start", StartMsg{
+			You: p0.Name, Opponent: p1.Name, Question: firstQuestion,
+		})
+		sendEvent(p1, "start", StartMsg{
+			You: p1.Name, Opponent: p0.Name, Question: firstQuestion,
+		})
+		log.Printf("[JOIN] %s joins %s's room", p1.Name, p0.Name)
 	}
+
+	// Timeout: cleanup ghost player if SSE never connects
+	go func() {
+		time.Sleep(30 * time.Second)
+		globalMu.Lock()
+		p, ok := players[playerID]
+		if ok && !p.sseConnected {
+			globalMu.Unlock()
+			handleDisconnect(playerID)
+			return
+		}
+		globalMu.Unlock()
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"playerId": playerID})
 }
 
-func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
+func handleAnswerHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	playerID := r.Header.Get("X-Player-ID")
+	if playerID == "" {
+		http.Error(w, "missing player id", http.StatusBadRequest)
+		return
+	}
+
 	var answerData AnswerData
-	if err := json.Unmarshal(data, &answerData); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&answerData); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
 
 	globalMu.Lock()
-	room, ok := rooms[conn]
-	player := players[conn]
+	room, ok := rooms[playerID]
+	player := players[playerID]
 	globalMu.Unlock()
 
 	if !ok || player == nil || room == nil || !room.started {
+		http.Error(w, "not in game", http.StatusBadRequest)
 		return
 	}
 
@@ -321,21 +318,17 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 		}
 	}
 
-	// Find opponent
 	var opponent *Player
-	if room.Players[0].conn == conn {
+	if room.Players[0].ID == playerID {
 		opponent = room.Players[1]
 	} else {
 		opponent = room.Players[0]
 	}
 
-	// Generate new question for this player only
 	newQuestion := generateQuestion(room.Operation)
 	player.question = newQuestion
 
-	// Send score update to the answering player
-	sendJSON(player, ScoreUpdateMsg{
-		Type:          "scoreUpdate",
+	sendEvent(player, "scoreUpdate", ScoreUpdateMsg{
 		YourScore:     player.Score,
 		OpponentScore: opponent.Score,
 		Correct:       correct,
@@ -343,50 +336,106 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 		Question:      newQuestion,
 	})
 
-	// Send opponent score update to the other player
-	sendJSON(opponent, OpponentScoreMsg{
-		Type:          "opponentScore",
+	sendEvent(opponent, "opponentScore", OpponentScoreMsg{
 		OpponentScore: player.Score,
 	})
 
-	// Check win
 	if player.Score >= winScore {
 		room.started = false
-		sendJSON(player, WinMsg{Type: "win", Winner: player.Name})
-		sendJSON(opponent, WinMsg{Type: "win", Winner: player.Name})
+		sendEvent(player, "win", WinMsg{Winner: player.Name})
+		sendEvent(opponent, "win", WinMsg{Winner: player.Name})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, `{"ok":true}`)
+}
+
+func handleEventsSSE(w http.ResponseWriter, r *http.Request) {
+	playerID := r.URL.Query().Get("playerId")
+	if playerID == "" {
+		http.Error(w, "missing playerId", http.StatusBadRequest)
+		return
+	}
+
+	globalMu.Lock()
+	player, ok := players[playerID]
+	if ok {
+		player.sseConnected = true
+	}
+	globalMu.Unlock()
+
+	if !ok || player == nil {
+		http.Error(w, "unknown player", http.StatusNotFound)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher.Flush()
+
+	ctx := r.Context()
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			handleDisconnect(playerID)
+			return
+		case msg, ok := <-player.events:
+			if !ok {
+				return
+			}
+			w.Write(msg)
+			flusher.Flush()
+		case <-ticker.C:
+			w.Write([]byte(": keepalive\n\n"))
+			flusher.Flush()
+		}
 	}
 }
 
-func handleDisconnect(conn *websocket.Conn) {
+func handleDisconnect(playerID string) {
 	globalMu.Lock()
 	defer globalMu.Unlock()
 
-	player := players[conn]
+	player := players[playerID]
 	name := "unknown"
 	if player != nil {
 		name = player.Name
+		select {
+		case <-player.done:
+		default:
+			close(player.done)
+		}
 	}
 	log.Printf("[DISCONNECT] %s disconnected", name)
 
-	room, ok := rooms[conn]
-	delete(rooms, conn)
-	delete(players, conn)
+	room, ok := rooms[playerID]
+	delete(rooms, playerID)
+	delete(players, playerID)
 
 	if !ok || room == nil {
 		return
 	}
 
-	// If this was the waiting room, clear it
-	if waitingRoom == room {
-		waitingRoom = nil
+	if waitingRooms[room.Operation] == room {
+		delete(waitingRooms, room.Operation)
 		return
 	}
 
-	// Notify the other player
 	for _, p := range room.Players {
-		if p != nil && p.conn != conn {
-			sendJSON(p, OpponentLeftMsg{Type: "opponentLeft"})
-			delete(rooms, p.conn)
+		if p != nil && p.ID != playerID {
+			sendEvent(p, "opponentLeft", struct{}{})
+			delete(rooms, p.ID)
 		}
 	}
 }
@@ -397,8 +446,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	http.HandleFunc("/api/join", handleJoinHTTP)
+	http.HandleFunc("/api/answer", handleAnswerHTTP)
+	http.HandleFunc("/api/events", handleEventsSSE)
 	http.Handle("/", http.FileServer(http.FS(staticFS)))
-	http.HandleFunc("/ws", handleWS)
 
 	port := "8080"
 	fmt.Printf("🧮 Chronomaths démarre sur http://localhost:%s\n", port)
