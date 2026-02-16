@@ -15,10 +15,11 @@ Chronomaths propose des sessions chronométrées de calcul mental où l'enfant d
 | 🚀 Sprint | 5 min | 24 | Rapide |
 | 🏃 Course | 10 min | 48 | Modéré |
 | 🏆 Marathon | 15 min | 72 | Endurance |
+| 📖 Révision par table | 2 min | 18 | Ciblé |
 
 ### Déroulement d'une partie
 
-1. **Choix du mode** : L'enfant sélectionne son défi
+1. **Choix du mode** : L'enfant sélectionne son défi (ou une table spécifique en mode Révision)
 2. **Calculs** : Les multiplications s'affichent une par une (tables de 2 à 10)
 3. **Feedback immédiat** : Chaque réponse est validée avec un retour visuel
 4. **Fin de partie** : Quand tous les calculs sont faits OU quand le temps est écoulé

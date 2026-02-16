@@ -1249,6 +1249,49 @@ body::after {
     margin-top: 0.5rem;
 }
 
+/* Table practice button on home (blue accent) */
+.table-practice-btn {
+    border-color: var(--secondary) !important;
+    background: linear-gradient(135deg, #f0faff, #e3f2fd) !important;
+}
+
+.table-practice-btn .multi-arrow {
+    color: var(--secondary-dark);
+}
+
+/* Table selection grid */
+.table-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.table-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem 1rem;
+    border: 2px solid #f0f0f0;
+    border-radius: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    min-height: 64px;
+}
+
+.table-btn:active {
+    transform: scale(0.95);
+}
+
+.table-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
 /* Posee button style on home (green accent) */
 .posee-btn {
     border-color: var(--success) !important;
@@ -1433,6 +1476,15 @@ body::after {
         font-size: 1.5rem;
     }
 
+    .table-btn {
+        padding: 1rem 0.75rem;
+        min-height: 56px;
+    }
+
+    .table-number {
+        font-size: 1.5rem;
+    }
+
     .posee-cell {
         width: 40px;
         height: 44px;
@@ -1554,6 +1606,17 @@ body::after {
         border-color: var(--accent-dark);
         transform: translateX(5px) scale(1.02);
         box-shadow: 0 8px 25px rgba(254, 202, 87, 0.35);
+    }
+
+    .table-practice-btn:hover {
+        border-color: var(--secondary-dark) !important;
+        box-shadow: 0 8px 25px rgba(72, 219, 251, 0.35) !important;
+    }
+
+    .table-btn:hover {
+        border-color: var(--secondary);
+        transform: scale(1.05);
+        box-shadow: 0 8px 20px rgba(72, 219, 251, 0.25);
     }
 
     .posee-btn:hover {

@@ -25,7 +25,8 @@ const screens = {
     multiJoin: document.getElementById('screen-multi-join'),
     multiWaiting: document.getElementById('screen-multi-waiting'),
     multiRace: document.getElementById('screen-multi-race'),
-    multiWin: document.getElementById('screen-multi-win')
+    multiWin: document.getElementById('screen-multi-win'),
+    tableSelect: document.getElementById('screen-table-select')
 };
 
 const elements = {
@@ -73,6 +74,20 @@ function generateQuestions(count) {
     return questions;
 }
 
+function generateTableQuestions(table, count) {
+    const factors = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const combinations = factors.map(f => ({ a: table, b: f, answer: table * f }));
+    shuffleArray(combinations);
+
+    const questions = [];
+    while (questions.length < count) {
+        const remaining = count - questions.length;
+        questions.push(...combinations.slice(0, remaining));
+        shuffleArray(combinations);
+    }
+    return questions;
+}
+
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -92,13 +107,13 @@ function formatTime(seconds) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-function startGame(totalTime, totalQuestions) {
+function startGame(totalTime, totalQuestions, customQuestions) {
     state.totalTime = totalTime;
     state.totalQuestions = totalQuestions;
     state.currentQuestion = 0;
     state.timeRemaining = totalTime;
     state.startTime = Date.now();
-    state.questions = generateQuestions(totalQuestions);
+    state.questions = customQuestions || generateQuestions(totalQuestions);
     state.answers = [];
     state.correct = 0;
     state.wrong = 0;
@@ -223,7 +238,7 @@ function endGame(timeout) {
 }
 
 // Solo events
-document.querySelectorAll('.mode-btn').forEach(btn => {
+document.querySelectorAll('.mode-btn[data-time][data-questions]').forEach(btn => {
     btn.addEventListener('click', () => {
         const time = parseInt(btn.dataset.time);
         const questions = parseInt(btn.dataset.questions);
@@ -249,6 +264,28 @@ document.getElementById('btn-stop-game').addEventListener('click', () => {
 });
 
 document.addEventListener('touchstart', () => {}, { passive: true });
+
+// ============================================================
+// TABLE PRACTICE MODE
+// ============================================================
+
+document.getElementById('btn-table-practice').addEventListener('click', () => {
+    showScreen('tableSelect');
+});
+
+document.getElementById('btn-table-back').addEventListener('click', () => {
+    showScreen('home');
+});
+
+document.querySelectorAll('.table-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const table = parseInt(btn.dataset.table);
+        const totalQuestions = 18;
+        const totalTime = 120;
+        const questions = generateTableQuestions(table, totalQuestions);
+        startGame(totalTime, totalQuestions, questions);
+    });
+});
 
 // ============================================================
 // MULTIPLICATION POSÉE MODE
