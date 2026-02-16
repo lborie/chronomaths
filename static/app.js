@@ -181,10 +181,44 @@ function shuffleArray(array) {
 // NAVIGATION & ÉCRANS
 // ============================================================
 
-function showScreen(screenName) {
+function showScreen(screenName, pushToHistory = true) {
     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenName].classList.add('active');
+    if (pushToHistory) {
+        history.pushState({ screen: screenName }, '', '#' + screenName);
+    }
 }
+
+function getActiveScreen() {
+    for (const [name, el] of Object.entries(screens)) {
+        if (el.classList.contains('active')) return name;
+    }
+    return 'home';
+}
+
+function cleanupScreen(screenName) {
+    switch (screenName) {
+        case 'game':
+            clearInterval(state.timerInterval);
+            break;
+        case 'multiWaiting':
+        case 'multiRace':
+        case 'multiWin':
+            if (multi.ws) {
+                multi.ws.close();
+                multi.ws = null;
+            }
+            break;
+    }
+}
+
+window.addEventListener('popstate', (event) => {
+    const target = event.state && event.state.screen ? event.state.screen : 'home';
+    cleanupScreen(getActiveScreen());
+    showScreen(target, false);
+});
+
+history.replaceState({ screen: 'home' }, '', '#home');
 
 function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
