@@ -33,10 +33,11 @@ type Player struct {
 }
 
 type Room struct {
-	ID      string
-	Players [2]*Player
-	mu      sync.Mutex
-	started bool
+	ID        string
+	Operation string
+	Players   [2]*Player
+	mu        sync.Mutex
+	started   bool
 }
 
 type Message struct {
@@ -45,7 +46,8 @@ type Message struct {
 }
 
 type JoinData struct {
-	Name string `json:"name"`
+	Name      string `json:"name"`
+	Operation string `json:"operation"`
 }
 
 type AnswerData struct {
@@ -104,11 +106,35 @@ var (
 const winScore = 20
 const penaltyPoints = 3
 
-func generateQuestion() Question {
+func generateQuestion(operation string) Question {
+	if operation == "addition" {
+		return generateAdditionQuestion()
+	}
+	return generateMultiplicationQuestion()
+}
+
+func generateMultiplicationQuestion() Question {
 	tables := []int{2, 3, 4, 5, 6, 7, 8, 9, 10}
 	a := tables[rand.Intn(len(tables))]
 	b := tables[rand.Intn(len(tables))]
 	return Question{A: a, B: b, Answer: a * b}
+}
+
+func generateAdditionQuestion() Question {
+	r := rand.Intn(100)
+	var a, b int
+	switch {
+	case r < 20: // easy
+		a = rand.Intn(19) + 2
+		b = rand.Intn(19) + 2
+	case r < 70: // medium
+		a = rand.Intn(90) + 10
+		b = rand.Intn(49) + 2
+	default: // hard
+		a = rand.Intn(50) + 50
+		b = rand.Intn(50) + 50
+	}
+	return Question{A: a, B: b, Answer: a + b}
 }
 
 func sendJSON(p *Player, v interface{}) {
@@ -177,15 +203,21 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 
 	players[conn] = player
 
+	operation := joinData.Operation
+	if operation != "addition" {
+		operation = "multiplication"
+	}
+
 	if waitingRoom == nil {
 		// Create a new room, this player waits
 		waitingRoom = &Room{
-			ID: fmt.Sprintf("room-%d", rand.Intn(100000)),
+			ID:        fmt.Sprintf("room-%d", rand.Intn(100000)),
+			Operation: operation,
 		}
 		waitingRoom.Players[0] = player
 		rooms[conn] = waitingRoom
 
-		log.Printf("[JOIN] %s creates room, sending waiting", player.Name)
+		log.Printf("[JOIN] %s creates room (%s), sending waiting", player.Name, operation)
 		sendJSON(player, WaitingMsg{Type: "waiting", Name: player.Name})
 	} else {
 		// Second player joins, start the game
@@ -195,7 +227,7 @@ func handleJoin(conn *websocket.Conn, data json.RawMessage) {
 		waitingRoom = nil
 
 		// Generate first question (same for both players)
-		firstQuestion := generateQuestion()
+		firstQuestion := generateQuestion(room.Operation)
 		room.started = true
 
 		// Notify both players
@@ -263,7 +295,7 @@ func handleAnswer(conn *websocket.Conn, data json.RawMessage) {
 	}
 
 	// Generate new question for this player only
-	newQuestion := generateQuestion()
+	newQuestion := generateQuestion(room.Operation)
 	player.question = newQuestion
 
 	// Send score update to the answering player

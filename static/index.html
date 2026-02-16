@@ -8,14 +8,38 @@
 </head>
 <body>
     <div class="container">
-        <!-- Écran d'accueil -->
+        <!-- Écran d'accueil : choix opération -->
         <div id="screen-home" class="screen active">
             <h1 class="title">
                 <span class="emoji">🧮</span>
                 Chronomaths
                 <span class="emoji">⏱️</span>
             </h1>
-            <p class="subtitle">Deviens une championne des multiplications!</p>
+            <p class="subtitle">Que veux-tu travailler ?</p>
+
+            <div class="mode-selection">
+                <div class="operation-choice">
+                    <button class="operation-card op-multiply" data-operation="multiplication">
+                        <span class="operation-symbol">×</span>
+                        <span class="operation-name">Multiplications</span>
+                        <span class="operation-desc">Tables de 2 à 10</span>
+                    </button>
+                    <button class="operation-card op-add" data-operation="addition">
+                        <span class="operation-symbol">+</span>
+                        <span class="operation-name">Additions</span>
+                        <span class="operation-desc">Calcul mental</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Écran choix du mode -->
+        <div id="screen-modes" class="screen">
+            <h1 class="title">
+                <span class="emoji" id="modes-emoji">🧮</span>
+                <span id="modes-title-text">Multiplications</span>
+            </h1>
+            <p id="modes-subtitle" class="subtitle">Deviens une championne des multiplications!</p>
 
             <div class="mode-selection">
                 <h2>Choisis ton défi:</h2>
@@ -47,8 +71,8 @@
                 <button id="btn-posee" class="multi-btn posee-btn">
                     <span class="multi-icon">📝</span>
                     <span class="multi-text">
-                        <span class="multi-title">Multiplications posées</span>
-                        <span class="multi-details">Apprends à poser les multiplications avec retenue</span>
+                        <span id="posee-btn-title" class="multi-title">Multiplications posées</span>
+                        <span id="posee-btn-desc" class="multi-details">Apprends à poser les multiplications avec retenue</span>
                     </span>
                     <span class="multi-arrow">→</span>
                 </button>
@@ -60,8 +84,8 @@
                 <button id="btn-table-practice" class="multi-btn table-practice-btn">
                     <span class="multi-icon">📖</span>
                     <span class="multi-text">
-                        <span class="multi-title">Révision par table</span>
-                        <span class="multi-details">Entraîne-toi sur une table au choix</span>
+                        <span id="practice-btn-title" class="multi-title">Révision par table</span>
+                        <span id="practice-btn-desc" class="multi-details">Entraîne-toi sur une table au choix</span>
                     </span>
                     <span class="multi-arrow">→</span>
                 </button>
@@ -78,6 +102,8 @@
                     </span>
                     <span class="multi-arrow">→</span>
                 </button>
+
+                <button id="btn-modes-back" class="back-btn" style="margin-top:1rem;">← Retour</button>
             </div>
         </div>
 
@@ -85,42 +111,42 @@
         <div id="screen-posee-difficulty" class="screen">
             <h1 class="title">
                 <span class="emoji">📝</span>
-                Multiplication posée
+                <span id="posee-diff-title">Multiplication posée</span>
             </h1>
             <p class="subtitle">Choisis ton niveau!</p>
 
             <div class="mode-selection">
                 <h2>Niveau de difficulté:</h2>
-                <div class="modes">
+                <div class="modes" id="posee-difficulty-modes">
                     <button class="mode-btn difficulty-btn difficulty-easy" data-difficulty="easy">
                         <span class="mode-icon">⭐</span>
                         <span class="mode-title">Facile</span>
-                        <span class="mode-details">× 1 chiffre</span>
-                        <span class="mode-questions">ex: 47 × 3</span>
+                        <span id="posee-easy-details" class="mode-details">× 1 chiffre</span>
+                        <span id="posee-easy-example" class="mode-questions">ex: 47 × 3</span>
                     </button>
                     <button class="mode-btn difficulty-btn difficulty-medium" data-difficulty="medium">
                         <span class="mode-icon">🔥</span>
                         <span class="mode-title">Moyen</span>
-                        <span class="mode-details">× 2 chiffres</span>
-                        <span class="mode-questions">ex: 47 × 23</span>
+                        <span id="posee-medium-details" class="mode-details">× 2 chiffres</span>
+                        <span id="posee-medium-example" class="mode-questions">ex: 47 × 23</span>
                     </button>
                     <button class="mode-btn difficulty-btn difficulty-hard" data-difficulty="hard">
                         <span class="mode-icon">💎</span>
                         <span class="mode-title">Difficile</span>
-                        <span class="mode-details">× 3 chiffres</span>
-                        <span class="mode-questions">ex: 234 × 123</span>
+                        <span id="posee-hard-details" class="mode-details">× 3 chiffres</span>
+                        <span id="posee-hard-example" class="mode-questions">ex: 234 × 123</span>
                     </button>
                 </div>
                 <button id="btn-posee-back" class="back-btn" style="margin-top:1rem;">← Retour</button>
             </div>
         </div>
 
-        <!-- Écran multiplication posée -->
+        <!-- Écran opération posée -->
         <div id="screen-posee" class="screen">
             <div class="posee-container">
                 <div class="posee-header">
                     <h2 class="posee-title">
-                        <span>📝</span> Multiplication posée
+                        <span>📝</span> <span id="posee-screen-title">Multiplication posée</span>
                     </h2>
                     <div class="posee-score">
                         <span class="posee-score-correct" id="posee-correct-count">0</span> ✅
@@ -128,7 +154,6 @@
                     </div>
                 </div>
 
-                <!-- La multiplication posée sera générée dynamiquement -->
                 <div id="posee-grid" class="posee-grid"></div>
 
                 <div id="posee-feedback" class="feedback"></div>
@@ -142,7 +167,7 @@
             </div>
         </div>
 
-        <!-- Écran résultats multiplication posée -->
+        <!-- Écran résultats posée -->
         <div id="screen-posee-results" class="screen">
             <div class="posee-results-card">
                 <div class="results-header">
@@ -174,27 +199,18 @@
             </div>
         </div>
 
-        <!-- Écran choix de table -->
+        <!-- Écran choix de table/nombre -->
         <div id="screen-table-select" class="screen">
             <h1 class="title">
                 <span class="emoji">📖</span>
-                Révision par table
+                <span id="table-select-title">Révision par table</span>
             </h1>
-            <p class="subtitle">Quelle table veux-tu réviser ?</p>
+            <p id="table-select-subtitle" class="subtitle">Quelle table veux-tu réviser ?</p>
 
             <div class="mode-selection">
-                <h2>Choisis ta table :</h2>
-                <div class="table-grid">
-                    <button class="table-btn" data-table="2"><span class="table-number">2</span></button>
-                    <button class="table-btn" data-table="3"><span class="table-number">3</span></button>
-                    <button class="table-btn" data-table="4"><span class="table-number">4</span></button>
-                    <button class="table-btn" data-table="5"><span class="table-number">5</span></button>
-                    <button class="table-btn" data-table="6"><span class="table-number">6</span></button>
-                    <button class="table-btn" data-table="7"><span class="table-number">7</span></button>
-                    <button class="table-btn" data-table="8"><span class="table-number">8</span></button>
-                    <button class="table-btn" data-table="9"><span class="table-number">9</span></button>
-                    <button class="table-btn" data-table="10"><span class="table-number">10</span></button>
-                </div>
+                <h2 id="table-select-heading">Choisis ta table :</h2>
+                <div id="table-grid" class="table-grid"></div>
+                <button id="btn-table-start" class="start-btn" disabled>Commencer</button>
                 <button id="btn-table-back" class="back-btn" style="margin-top:1rem;">← Retour</button>
             </div>
         </div>
@@ -241,7 +257,6 @@
         <!-- Écran course multi -->
         <div id="screen-multi-race" class="screen">
             <div class="race-container">
-                <!-- Piste de course -->
                 <div class="race-track">
                     <div class="track-labels">
                         <span class="track-start">0</span>
@@ -267,11 +282,10 @@
                     </div>
                 </div>
 
-                <!-- Question -->
                 <div class="race-question-card">
                     <div class="race-question">
                         <span id="multi-num1" class="number">7</span>
-                        <span class="operator">×</span>
+                        <span id="multi-operator" class="operator">×</span>
                         <span id="multi-num2" class="number">8</span>
                         <span class="equals">=</span>
                         <span class="answer-box">?</span>
@@ -337,7 +351,7 @@
             <div class="question-card">
                 <div class="question">
                     <span id="num1" class="number">7</span>
-                    <span class="operator">×</span>
+                    <span id="solo-operator" class="operator">×</span>
                     <span id="num2" class="number">8</span>
                     <span class="equals">=</span>
                     <span class="answer-box">?</span>

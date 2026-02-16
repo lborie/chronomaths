@@ -207,6 +207,78 @@ body::after {
 }
 
 /* ============================================================
+   CHOIX D'OPÉRATION
+   ============================================================ */
+.operation-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.operation-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 1rem;
+    border: 3px solid transparent;
+    border-radius: 1.5rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: screenPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.operation-card:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.operation-card:active {
+    transform: scale(0.95);
+}
+
+.operation-symbol {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.op-multiply {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, #fff0f0, #ffe8e0);
+}
+
+.op-multiply .operation-symbol {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.op-add {
+    border-color: var(--success);
+    background: linear-gradient(135deg, #f0fff4, #e0f8e8);
+}
+
+.op-add .operation-symbol {
+    background: linear-gradient(135deg, var(--success), #1abc9c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.operation-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.operation-desc {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+/* ============================================================
    ÉCRAN DE JEU
    ============================================================ */
 #screen-game {
@@ -1279,8 +1351,43 @@ body::after {
     min-height: 64px;
 }
 
+.table-btn.selected {
+    border-color: var(--secondary);
+    background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(72, 219, 251, 0.3);
+}
+
+.table-btn.selected .table-number {
+    background: linear-gradient(135deg, var(--primary), var(--secondary-dark));
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
 .table-btn:active {
     transform: scale(0.95);
+}
+
+#btn-table-start {
+    margin-top: 1.25rem;
+    padding: 0.9rem 2.5rem;
+    border: none;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+#btn-table-start:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#btn-table-start:not(:disabled):active {
+    transform: scale(0.97);
 }
 
 .table-number {
@@ -1441,6 +1548,18 @@ body::after {
 }
 
 @media (max-width: 400px) {
+    .operation-choice {
+        grid-template-columns: 1fr;
+    }
+
+    .operation-card {
+        padding: 1.5rem 1rem;
+    }
+
+    .operation-symbol {
+        font-size: 2.5rem;
+    }
+
     .title {
         font-size: 2rem;
     }
@@ -1608,6 +1727,18 @@ body::after {
         box-shadow: 0 8px 25px rgba(254, 202, 87, 0.35);
     }
 
+    .op-multiply:hover {
+        transform: scale(1.03);
+        box-shadow: 0 12px 30px rgba(255, 107, 107, 0.3);
+        border-color: var(--primary-dark);
+    }
+
+    .op-add:hover {
+        transform: scale(1.03);
+        box-shadow: 0 12px 30px rgba(46, 213, 115, 0.3);
+        border-color: #1abc9c;
+    }
+
     .table-practice-btn:hover {
         border-color: var(--secondary-dark) !important;
         box-shadow: 0 8px 25px rgba(72, 219, 251, 0.35) !important;
@@ -1617,6 +1748,11 @@ body::after {
         border-color: var(--secondary);
         transform: scale(1.05);
         box-shadow: 0 8px 20px rgba(72, 219, 251, 0.25);
+    }
+
+    #btn-table-start:not(:disabled):hover {
+        transform: scale(1.03);
+        box-shadow: 0 6px 16px rgba(72, 219, 251, 0.35);
     }
 
     .posee-btn:hover {

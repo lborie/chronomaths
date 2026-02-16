@@ -1,4 +1,19 @@
 // ============================================================
+// CONFIGURATION GLOBALE
+// ============================================================
+const config = {
+    operation: 'multiplication' // 'multiplication' | 'addition'
+};
+
+function getOperatorSymbol() {
+    return config.operation === 'multiplication' ? '×' : '+';
+}
+
+function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// ============================================================
 // SOLO MODE - État du jeu
 // ============================================================
 const state = {
@@ -17,16 +32,17 @@ const state = {
 // Éléments DOM - Solo
 const screens = {
     home: document.getElementById('screen-home'),
+    modes: document.getElementById('screen-modes'),
     game: document.getElementById('screen-game'),
     results: document.getElementById('screen-results'),
     poseeDifficulty: document.getElementById('screen-posee-difficulty'),
     posee: document.getElementById('screen-posee'),
     poseeResults: document.getElementById('screen-posee-results'),
+    tableSelect: document.getElementById('screen-table-select'),
     multiJoin: document.getElementById('screen-multi-join'),
     multiWaiting: document.getElementById('screen-multi-waiting'),
     multiRace: document.getElementById('screen-multi-race'),
-    multiWin: document.getElementById('screen-multi-win'),
-    tableSelect: document.getElementById('screen-table-select')
+    multiWin: document.getElementById('screen-multi-win')
 };
 
 const elements = {
@@ -37,6 +53,7 @@ const elements = {
     progressFill: document.getElementById('progress-fill'),
     num1: document.getElementById('num1'),
     num2: document.getElementById('num2'),
+    soloOperator: document.getElementById('solo-operator'),
     answerInput: document.getElementById('answer-input'),
     answerForm: document.getElementById('answer-form'),
     feedback: document.getElementById('feedback'),
@@ -50,8 +67,12 @@ const elements = {
     playAgain: document.getElementById('play-again')
 };
 
-// Génère les questions de multiplication
-function generateQuestions(count) {
+// ============================================================
+// GÉNÉRATION DE QUESTIONS
+// ============================================================
+
+// Multiplications : toutes combinaisons tables 2-10
+function generateMultiplicationQuestions(count) {
     const questions = [];
     const tables = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -66,17 +87,71 @@ function generateQuestions(count) {
 
     while (questions.length < count) {
         const remaining = count - questions.length;
-        const toAdd = allCombinations.slice(0, remaining);
-        questions.push(...toAdd);
+        questions.push(...allCombinations.slice(0, remaining));
         shuffleArray(allCombinations);
     }
 
     return questions;
 }
 
-function generateTableQuestions(table, count) {
+// Additions : difficulté mixte
+function generateAdditionQuestions(count) {
+    const pool = [];
+
+    // 20% facile (2-20 + 2-20)
+    for (let i = 0; i < 20; i++) {
+        const a = randInt(2, 20), b = randInt(2, 20);
+        pool.push({ a, b, answer: a + b });
+    }
+    // 50% moyen (10-99 + 2-50)
+    for (let i = 0; i < 50; i++) {
+        const a = randInt(10, 99), b = randInt(2, 50);
+        pool.push({ a, b, answer: a + b });
+    }
+    // 30% difficile (50-99 + 50-99)
+    for (let i = 0; i < 30; i++) {
+        const a = randInt(50, 99), b = randInt(50, 99);
+        pool.push({ a, b, answer: a + b });
+    }
+
+    shuffleArray(pool);
+
+    const questions = [];
+    while (questions.length < count) {
+        const remaining = count - questions.length;
+        questions.push(...pool.slice(0, remaining));
+        shuffleArray(pool);
+    }
+    return questions;
+}
+
+function generateQuestions(count) {
+    return config.operation === 'multiplication'
+        ? generateMultiplicationQuestions(count)
+        : generateAdditionQuestions(count);
+}
+
+// Révision par table (multiplications) — tables: array de nombres
+function generateTableQuestions(tables, count) {
     const factors = [2, 3, 4, 5, 6, 7, 8, 9, 10];
-    const combinations = factors.map(f => ({ a: table, b: f, answer: table * f }));
+    const combinations = [];
+    tables.forEach(t => factors.forEach(f => combinations.push({ a: t, b: f, answer: t * f })));
+    shuffleArray(combinations);
+
+    const questions = [];
+    while (questions.length < count) {
+        const remaining = count - questions.length;
+        questions.push(...combinations.slice(0, remaining));
+        shuffleArray(combinations);
+    }
+    return questions;
+}
+
+// Révision par nombre (additions) — numbers: array de nombres
+function generateNumberQuestions(numbers, count) {
+    const addends = [2, 3, 4, 5, 6, 7, 8, 9];
+    const combinations = [];
+    numbers.forEach(n => addends.forEach(b => combinations.push({ a: n, b, answer: n + b })));
     shuffleArray(combinations);
 
     const questions = [];
@@ -96,6 +171,10 @@ function shuffleArray(array) {
     return array;
 }
 
+// ============================================================
+// NAVIGATION & ÉCRANS
+// ============================================================
+
 function showScreen(screenName) {
     Object.values(screens).forEach(screen => screen.classList.remove('active'));
     screens[screenName].classList.add('active');
@@ -106,6 +185,116 @@ function formatTime(seconds) {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
+
+// Met à jour l'écran des modes selon l'opération choisie
+function updateModesScreen() {
+    const isMulti = config.operation === 'multiplication';
+
+    document.getElementById('modes-emoji').textContent = isMulti ? '🧮' : '➕';
+    document.getElementById('modes-title-text').textContent = isMulti ? 'Multiplications' : 'Additions';
+    document.getElementById('modes-subtitle').textContent = isMulti
+        ? 'Deviens une championne des multiplications!'
+        : 'Deviens une championne des additions!';
+
+    // Bouton posée
+    document.getElementById('posee-btn-title').textContent = isMulti
+        ? 'Multiplications posées' : 'Additions posées';
+    document.getElementById('posee-btn-desc').textContent = isMulti
+        ? 'Apprends à poser les multiplications avec retenue'
+        : 'Apprends à poser les additions avec retenue';
+
+    // Bouton révision
+    document.getElementById('practice-btn-title').textContent = isMulti
+        ? 'Révision par table' : 'Révision par nombre';
+    document.getElementById('practice-btn-desc').textContent = isMulti
+        ? 'Entraîne-toi sur une table au choix'
+        : 'Entraîne-toi avec un nombre au choix';
+
+    // Écran posée difficulté
+    document.getElementById('posee-diff-title').textContent = isMulti
+        ? 'Multiplication posée' : 'Addition posée';
+    document.getElementById('posee-screen-title').textContent = isMulti
+        ? 'Multiplication posée' : 'Addition posée';
+
+    if (isMulti) {
+        document.getElementById('posee-easy-details').textContent = '× 1 chiffre';
+        document.getElementById('posee-easy-example').textContent = 'ex: 47 × 3';
+        document.getElementById('posee-medium-details').textContent = '× 2 chiffres';
+        document.getElementById('posee-medium-example').textContent = 'ex: 47 × 23';
+        document.getElementById('posee-hard-details').textContent = '× 3 chiffres';
+        document.getElementById('posee-hard-example').textContent = 'ex: 234 × 123';
+    } else {
+        document.getElementById('posee-easy-details').textContent = '2 chiffres';
+        document.getElementById('posee-easy-example').textContent = 'ex: 47 + 38';
+        document.getElementById('posee-medium-details').textContent = '3 chiffres';
+        document.getElementById('posee-medium-example').textContent = 'ex: 247 + 385';
+        document.getElementById('posee-hard-details').textContent = '4 chiffres';
+        document.getElementById('posee-hard-example').textContent = 'ex: 2345 + 1678';
+    }
+
+    // Écran table/nombre select
+    updateTableSelectScreen();
+}
+
+function updateTableSelectScreen() {
+    const isMulti = config.operation === 'multiplication';
+    const grid = document.getElementById('table-grid');
+    const startBtn = document.getElementById('btn-table-start');
+    const selected = new Set();
+
+    document.getElementById('table-select-title').textContent = isMulti
+        ? 'Révision par table' : 'Révision par nombre';
+    document.getElementById('table-select-subtitle').textContent = isMulti
+        ? 'Quelles tables veux-tu réviser ?' : 'Quels nombres veux-tu travailler ?';
+    document.getElementById('table-select-heading').textContent = isMulti
+        ? 'Choisis tes tables :' : 'Choisis tes nombres :';
+
+    const values = isMulti
+        ? [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        : [2, 3, 4, 5, 6, 7, 8, 9];
+
+    function updateStartBtn() {
+        startBtn.disabled = selected.size === 0;
+    }
+
+    grid.textContent = '';
+    values.forEach(val => {
+        const btn = document.createElement('button');
+        btn.className = 'table-btn';
+        btn.dataset.table = val;
+        const span = document.createElement('span');
+        span.className = 'table-number';
+        span.textContent = val;
+        btn.appendChild(span);
+        btn.addEventListener('click', () => {
+            if (selected.has(val)) {
+                selected.delete(val);
+                btn.classList.remove('selected');
+            } else {
+                selected.add(val);
+                btn.classList.add('selected');
+            }
+            updateStartBtn();
+        });
+        grid.appendChild(btn);
+    });
+
+    startBtn.disabled = true;
+    startBtn.onclick = () => {
+        if (selected.size === 0) return;
+        const vals = Array.from(selected);
+        const totalQuestions = 18;
+        const totalTime = 120;
+        const questions = isMulti
+            ? generateTableQuestions(vals, totalQuestions)
+            : generateNumberQuestions(vals, totalQuestions);
+        startGame(totalTime, totalQuestions, questions);
+    };
+}
+
+// ============================================================
+// SOLO GAME LOGIC
+// ============================================================
 
 function startGame(totalTime, totalQuestions, customQuestions) {
     state.totalTime = totalTime;
@@ -118,6 +307,7 @@ function startGame(totalTime, totalQuestions, customQuestions) {
     state.correct = 0;
     state.wrong = 0;
 
+    elements.soloOperator.textContent = getOperatorSymbol();
     elements.totalQuestions.textContent = totalQuestions;
     elements.timerDisplay.textContent = formatTime(totalTime);
     elements.timer.classList.remove('warning', 'danger');
@@ -162,6 +352,7 @@ function showQuestion() {
 function checkAnswer(userAnswer) {
     const question = state.questions[state.currentQuestion];
     const isCorrect = userAnswer === question.answer;
+    const op = getOperatorSymbol();
 
     state.answers.push({ question, userAnswer, isCorrect });
 
@@ -171,7 +362,7 @@ function checkAnswer(userAnswer) {
         elements.feedback.className = 'feedback correct';
     } else {
         state.wrong++;
-        elements.feedback.textContent = `${question.a} \u00d7 ${question.b} = ${question.answer}`;
+        elements.feedback.textContent = `${question.a} ${op} ${question.b} = ${question.answer}`;
         elements.feedback.className = 'feedback wrong';
     }
 
@@ -191,6 +382,7 @@ function checkAnswer(userAnswer) {
 
 function endGame(timeout) {
     clearInterval(state.timerInterval);
+    const op = getOperatorSymbol();
 
     const timeElapsed = Math.floor((Date.now() - state.startTime) / 1000);
     const displayTime = timeout ? state.totalTime : timeElapsed;
@@ -202,7 +394,6 @@ function endGame(timeout) {
     const score = Math.round((state.correct / state.totalQuestions) * 100);
     elements.statScore.textContent = `${score}%`;
 
-    // Update results header using DOM methods
     const resultsIcon = elements.resultsHeader.querySelector('.results-icon');
     const resultsTitle = elements.resultsHeader.querySelector('h2');
 
@@ -227,7 +418,7 @@ function endGame(timeout) {
         errors.forEach(e => {
             const span = document.createElement('span');
             span.className = 'error-item';
-            span.textContent = `${e.question.a} \u00d7 ${e.question.b} = ${e.question.answer}`;
+            span.textContent = `${e.question.a} ${op} ${e.question.b} = ${e.question.answer}`;
             elements.errorsList.appendChild(span);
         });
     } else {
@@ -237,7 +428,25 @@ function endGame(timeout) {
     showScreen('results');
 }
 
-// Solo events
+// ============================================================
+// SOLO EVENTS
+// ============================================================
+
+// Choix d'opération
+document.querySelectorAll('.operation-card').forEach(card => {
+    card.addEventListener('click', () => {
+        config.operation = card.dataset.operation;
+        updateModesScreen();
+        showScreen('modes');
+    });
+});
+
+// Retour depuis les modes
+document.getElementById('btn-modes-back').addEventListener('click', () => {
+    showScreen('home');
+});
+
+// Modes chronométrés
 document.querySelectorAll('.mode-btn[data-time][data-questions]').forEach(btn => {
     btn.addEventListener('click', () => {
         const time = parseInt(btn.dataset.time);
@@ -255,49 +464,40 @@ elements.answerForm.addEventListener('submit', (e) => {
 });
 
 elements.playAgain.addEventListener('click', () => {
-    showScreen('home');
+    showScreen('modes');
 });
 
 document.getElementById('btn-stop-game').addEventListener('click', () => {
     clearInterval(state.timerInterval);
-    showScreen('home');
+    showScreen('modes');
 });
 
 document.addEventListener('touchstart', () => {}, { passive: true });
 
 // ============================================================
-// TABLE PRACTICE MODE
+// TABLE/NUMBER PRACTICE MODE
 // ============================================================
 
 document.getElementById('btn-table-practice').addEventListener('click', () => {
+    updateTableSelectScreen();
     showScreen('tableSelect');
 });
 
 document.getElementById('btn-table-back').addEventListener('click', () => {
-    showScreen('home');
-});
-
-document.querySelectorAll('.table-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const table = parseInt(btn.dataset.table);
-        const totalQuestions = 18;
-        const totalTime = 120;
-        const questions = generateTableQuestions(table, totalQuestions);
-        startGame(totalTime, totalQuestions, questions);
-    });
+    showScreen('modes');
 });
 
 // ============================================================
-// MULTIPLICATION POSÉE MODE
+// OP\u00c9RATION POS\u00c9E MODE
 // ============================================================
 
 const poseeState = {
-    a: 0,           // multiplicande
-    b: 0,           // multiplicateur
-    difficulty: 'easy', // 'easy' | 'medium' | 'hard'
+    a: 0,
+    b: 0,
+    difficulty: 'easy',
     correctCount: 0,
     wrongCount: 0,
-    history: [],     // historique des calculs
+    history: [],
     validated: false
 };
 
@@ -321,16 +521,14 @@ const poseeEl = {
     btnReplay: document.getElementById('btn-posee-replay')
 };
 
-// Navigate to posee difficulty selection
 poseeEl.btnPosee.addEventListener('click', () => {
     showScreen('poseeDifficulty');
 });
 
 poseeEl.btnPoseeBack.addEventListener('click', () => {
-    showScreen('home');
+    showScreen('modes');
 });
 
-// Difficulty buttons → start posee with selected difficulty
 poseeEl.difficultyBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         poseeState.difficulty = btn.dataset.difficulty;
@@ -346,24 +544,43 @@ poseeEl.difficultyBtns.forEach(btn => {
 
 function generatePosee() {
     const diff = poseeState.difficulty;
-    if (diff === 'easy') {
-        poseeState.a = Math.floor(Math.random() * 90) + 10;   // 10-99
-        poseeState.b = Math.floor(Math.random() * 8) + 2;     // 2-9
-    } else if (diff === 'medium') {
-        poseeState.a = Math.floor(Math.random() * 90) + 10;   // 10-99
-        poseeState.b = Math.floor(Math.random() * 89) + 11;   // 11-99
-    } else {
-        poseeState.a = Math.floor(Math.random() * 900) + 100; // 100-999
-        poseeState.b = Math.floor(Math.random() * 899) + 101; // 101-999
-    }
-    poseeState.validated = false;
+    const isMulti = config.operation === 'multiplication';
 
+    if (isMulti) {
+        if (diff === 'easy') {
+            poseeState.a = randInt(10, 99);
+            poseeState.b = randInt(2, 9);
+        } else if (diff === 'medium') {
+            poseeState.a = randInt(10, 99);
+            poseeState.b = randInt(11, 99);
+        } else {
+            poseeState.a = randInt(100, 999);
+            poseeState.b = randInt(101, 999);
+        }
+    } else {
+        if (diff === 'easy') {
+            poseeState.a = randInt(10, 99);
+            poseeState.b = randInt(10, 99);
+        } else if (diff === 'medium') {
+            poseeState.a = randInt(100, 999);
+            poseeState.b = randInt(100, 999);
+        } else {
+            poseeState.a = randInt(1000, 9999);
+            poseeState.b = randInt(1000, 9999);
+        }
+    }
+
+    poseeState.validated = false;
     poseeEl.feedback.textContent = '';
     poseeEl.feedback.className = 'feedback';
     poseeEl.btnValidate.style.display = '';
     poseeEl.btnNext.style.display = 'none';
 
-    renderPosee();
+    if (isMulti) {
+        renderMultiplicationPosee();
+    } else {
+        renderAdditionPosee();
+    }
 }
 
 // Helpers pour créer les éléments de la grille
@@ -424,7 +641,6 @@ function createInputRow(maxLen, numStr, padLeft, inputClass, groupIdx, trailingZ
                 input.dataset.pos = pos;
                 input.dataset.col = i;
                 input.dataset.group = groupIdx;
-                // Trailing zeros are pre-filled and read-only
                 if (trailingZeros && pos >= numStr.length - trailingZeros) {
                     input.value = '0';
                     input.readOnly = true;
@@ -441,10 +657,9 @@ function createInputRow(maxLen, numStr, padLeft, inputClass, groupIdx, trailingZ
 function setupInputNavigation(grid) {
     const allInputs = Array.from(grid.querySelectorAll('input:not([readonly])'));
 
-    allInputs.forEach((inp, idx) => {
+    allInputs.forEach((inp) => {
         inp.addEventListener('input', () => {
             inp.value = inp.value.replace(/[^0-9]/g, '').slice(-1);
-            // Auto-advance to previous (left) input in same row
             if (inp.value) {
                 const sameGroup = allInputs.filter(i => i.dataset.group === inp.dataset.group && i.className === inp.className);
                 const idxInGroup = sameGroup.indexOf(inp);
@@ -472,7 +687,11 @@ function setupInputNavigation(grid) {
     });
 }
 
-function renderPosee() {
+// ============================================================
+// MULTIPLICATION POS\u00c9E - Rendu
+// ============================================================
+
+function renderMultiplicationPosee() {
     const a = poseeState.a;
     const b = poseeState.b;
     const bStr = String(b);
@@ -482,16 +701,14 @@ function renderPosee() {
     const bDigits = bStr.split('').map(Number);
     const isMultiDigit = bDigits.length > 1;
 
-    // Compute partial products
     const partials = [];
     for (let d = 0; d < bDigits.length; d++) {
-        const digit = bDigits[bDigits.length - 1 - d]; // from units to leftmost
+        const digit = bDigits[bDigits.length - 1 - d];
         const partial = a * digit;
         const shiftedStr = String(partial) + '0'.repeat(d);
         partials.push({ digit, partial, shifted: partial * Math.pow(10, d), shiftedStr, zeros: d });
     }
 
-    // Grid width = max of all number widths
     const allWidths = [aStr.length + 1, bStr.length + 1, resultStr.length];
     partials.forEach(p => allWidths.push(p.shiftedStr.length));
     const maxLen = Math.max(...allWidths);
@@ -504,17 +721,13 @@ function renderPosee() {
     const padB = maxLen - bStr.length;
 
     if (!isMultiDigit) {
-        // === FACILE : format identique à l'ancien (1 chiffre) ===
-        // Carry row
         const carryStart = Math.max(0, padA - 1);
         const carryEnd = padA + aStr.length - 2;
         grid.appendChild(createCarryRow(maxLen, carryStart, carryEnd, 0));
     }
 
-    // Multiplicande row
     grid.appendChild(createDigitRow(maxLen, aStr, padA));
 
-    // Multiplicateur row (× sign + digits)
     const rowB = document.createElement('div');
     rowB.className = 'posee-row';
     for (let i = 0; i < maxLen; i++) {
@@ -531,50 +744,117 @@ function renderPosee() {
     }
     grid.appendChild(rowB);
 
-    // Separator
     const sep1 = document.createElement('div');
     sep1.className = 'posee-separator';
     grid.appendChild(sep1);
 
     if (!isMultiDigit) {
-        // === FACILE : une seule ligne de résultat ===
         const padResult = maxLen - resultStr.length;
         grid.appendChild(createInputRow(maxLen, resultStr, padResult, 'posee-input', 0, 0));
     } else {
-        // === MOYEN / DIFFICILE : produits partiels + résultat final ===
         partials.forEach((p, idx) => {
-            // Carry row for this partial product
             const carryStart = Math.max(0, padA - 1);
             const carryEnd = padA + aStr.length - 2;
             grid.appendChild(createCarryRow(maxLen, carryStart, carryEnd, idx));
 
-            // Partial product input row
             const padPartial = maxLen - p.shiftedStr.length;
             grid.appendChild(createInputRow(maxLen, p.shiftedStr, padPartial, 'posee-input posee-partial', idx, p.zeros));
         });
 
-        // Final separator
         const sep2 = document.createElement('div');
         sep2.className = 'posee-separator';
         grid.appendChild(sep2);
 
-        // Final result row
         const padResult = maxLen - resultStr.length;
         grid.appendChild(createInputRow(maxLen, resultStr, padResult, 'posee-input posee-final', 'final', 0));
     }
 
     setupInputNavigation(grid);
 
-    // Focus on last editable input of first input row
     const firstRowInputs = grid.querySelectorAll('[data-group="0"].posee-input:not([readonly])');
     if (firstRowInputs.length > 0) {
         firstRowInputs[firstRowInputs.length - 1].focus();
     }
 }
 
+// ============================================================
+// ADDITION POS\u00c9E - Rendu
+// ============================================================
+
+function renderAdditionPosee() {
+    const a = poseeState.a;
+    const b = poseeState.b;
+    const aStr = String(a);
+    const bStr = String(b);
+    const result = a + b;
+    const resultStr = String(result);
+
+    const maxLen = Math.max(aStr.length + 1, bStr.length + 1, resultStr.length);
+
+    const grid = poseeEl.grid;
+    grid.textContent = '';
+    grid.style.setProperty('--posee-cols', maxLen);
+
+    const padA = maxLen - aStr.length;
+    const padB = maxLen - bStr.length;
+
+    // Carry row
+    const carryStart = Math.max(0, padA - 1);
+    const carryEnd = maxLen - 2;
+    grid.appendChild(createCarryRow(maxLen, carryStart, carryEnd, 0));
+
+    // First number
+    grid.appendChild(createDigitRow(maxLen, aStr, padA));
+
+    // Second number with + operator
+    const rowB = document.createElement('div');
+    rowB.className = 'posee-row';
+    for (let i = 0; i < maxLen; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'posee-cell';
+        if (i === padB - 1) {
+            cell.textContent = '+';
+            cell.classList.add('posee-operator');
+        } else if (i >= padB) {
+            cell.textContent = bStr[i - padB];
+            cell.classList.add('posee-digit');
+        }
+        rowB.appendChild(cell);
+    }
+    grid.appendChild(rowB);
+
+    // Separator
+    const sep = document.createElement('div');
+    sep.className = 'posee-separator';
+    grid.appendChild(sep);
+
+    // Result input row
+    const padResult = maxLen - resultStr.length;
+    grid.appendChild(createInputRow(maxLen, resultStr, padResult, 'posee-input', 0, 0));
+
+    setupInputNavigation(grid);
+
+    const inputs = grid.querySelectorAll('.posee-input:not([readonly])');
+    if (inputs.length > 0) {
+        inputs[inputs.length - 1].focus();
+    }
+}
+
+// ============================================================
+// VALIDATION POS\u00c9E
+// ============================================================
+
 function validatePosee() {
     if (poseeState.validated) return;
 
+    if (config.operation === 'multiplication') {
+        validateMultiplicationPosee();
+    } else {
+        validateAdditionPosee();
+    }
+}
+
+function validateMultiplicationPosee() {
     const a = poseeState.a;
     const b = poseeState.b;
     const result = a * b;
@@ -587,12 +867,10 @@ function validatePosee() {
     let allCorrect = true;
 
     if (!isMultiDigit) {
-        // Facile : validate single result row
         const inputs = grid.querySelectorAll('.posee-input');
         let userAnswer = '';
         inputs.forEach(inp => { userAnswer += inp.value || ''; });
-        const correct = userAnswer === resultStr;
-        if (!correct) allCorrect = false;
+        if (userAnswer !== resultStr) allCorrect = false;
 
         inputs.forEach((inp, idx) => {
             inp.readOnly = true;
@@ -603,7 +881,6 @@ function validatePosee() {
             }
         });
     } else {
-        // Moyen/Difficile : validate each partial + final
         const partials = [];
         for (let d = 0; d < bDigits.length; d++) {
             const digit = bDigits[bDigits.length - 1 - d];
@@ -612,7 +889,6 @@ function validatePosee() {
             partials.push(shiftedStr);
         }
 
-        // Validate each partial product
         partials.forEach((expected, idx) => {
             const inputs = grid.querySelectorAll(`.posee-partial[data-group="${idx}"]`);
             let userVal = '';
@@ -629,7 +905,6 @@ function validatePosee() {
             });
         });
 
-        // Validate final result
         const finalInputs = grid.querySelectorAll('.posee-final');
         let userFinal = '';
         finalInputs.forEach(inp => { userFinal += inp.value || ''; });
@@ -645,6 +920,41 @@ function validatePosee() {
         });
     }
 
+    finishPoseeValidation(allCorrect);
+    validateMultiplicationCarries();
+}
+
+function validateAdditionPosee() {
+    const result = poseeState.a + poseeState.b;
+    const resultStr = String(result);
+    const grid = poseeEl.grid;
+
+    let allCorrect = true;
+
+    const inputs = grid.querySelectorAll('.posee-input');
+    let userAnswer = '';
+    inputs.forEach(inp => { userAnswer += inp.value || ''; });
+    if (userAnswer !== resultStr) allCorrect = false;
+
+    inputs.forEach((inp, idx) => {
+        inp.readOnly = true;
+        if (inp.value === resultStr[idx]) {
+            inp.classList.add('posee-input-correct');
+        } else {
+            inp.classList.add('posee-input-wrong');
+        }
+    });
+
+    finishPoseeValidation(allCorrect);
+    validateAdditionCarries();
+}
+
+function finishPoseeValidation(allCorrect) {
+    const a = poseeState.a;
+    const b = poseeState.b;
+    const op = getOperatorSymbol();
+    const result = config.operation === 'multiplication' ? a * b : a + b;
+
     poseeState.validated = true;
     poseeState.history.push({ a, b, result, isCorrect: allCorrect });
 
@@ -656,17 +966,16 @@ function validatePosee() {
     } else {
         poseeState.wrongCount++;
         poseeEl.wrongCount.textContent = poseeState.wrongCount;
-        poseeEl.feedback.textContent = `La bonne r\u00e9ponse est ${a} \u00d7 ${b} = ${result}`;
+        poseeEl.feedback.textContent = `La bonne r\u00e9ponse est ${a} ${op} ${b} = ${result}`;
         poseeEl.feedback.className = 'feedback wrong';
     }
 
-    validateCarries();
     poseeEl.btnValidate.style.display = 'none';
     poseeEl.btnNext.style.display = '';
     poseeEl.btnNext.focus();
 }
 
-function validateCarries() {
+function validateMultiplicationCarries() {
     const a = poseeState.a;
     const b = poseeState.b;
     const aStr = String(a);
@@ -675,7 +984,6 @@ function validateCarries() {
     const maxLen = parseInt(poseeEl.grid.style.getPropertyValue('--posee-cols'));
     const padA = maxLen - aStr.length;
 
-    // For each group, compute expected carries
     const groups = bDigits.length > 1 ? bDigits.length : 1;
     for (let g = 0; g < groups; g++) {
         const digit = bDigits.length > 1 ? bDigits[bDigits.length - 1 - g] : b;
@@ -716,6 +1024,52 @@ function validateCarries() {
     }
 }
 
+function validateAdditionCarries() {
+    const a = poseeState.a;
+    const b = poseeState.b;
+    const aStr = String(a);
+    const bStr = String(b);
+    const maxLen = parseInt(poseeEl.grid.style.getPropertyValue('--posee-cols'));
+
+    const carryInputs = poseeEl.grid.querySelectorAll('.posee-carry-input[data-group="0"]');
+
+    // Compute expected carries for addition
+    const expectedCarries = {};
+    let carry = 0;
+    const maxDigits = Math.max(aStr.length, bStr.length);
+    for (let i = 0; i < maxDigits; i++) {
+        const dA = i < aStr.length ? parseInt(aStr[aStr.length - 1 - i]) : 0;
+        const dB = i < bStr.length ? parseInt(bStr[bStr.length - 1 - i]) : 0;
+        const sum = dA + dB + carry;
+        carry = Math.floor(sum / 10);
+        if (carry > 0) {
+            const col = maxLen - 2 - i;
+            if (col >= 0) expectedCarries[col] = carry;
+        }
+    }
+
+    carryInputs.forEach(inp => {
+        inp.readOnly = true;
+        const col = parseInt(inp.dataset.col);
+        const expected = expectedCarries[col];
+        const userVal = inp.value.trim();
+
+        if (expected) {
+            if (userVal === String(expected)) {
+                inp.classList.add('posee-carry-correct');
+            } else {
+                inp.value = expected;
+                inp.classList.add('posee-carry-shown');
+            }
+        } else {
+            if (userVal && userVal !== '0') {
+                inp.value = '';
+                inp.classList.add('posee-carry-wrong');
+            }
+        }
+    });
+}
+
 function nextPosee() {
     generatePosee();
 }
@@ -729,21 +1083,22 @@ poseeEl.btnStop.addEventListener('click', () => {
 
 function showPoseeResults() {
     const total = poseeState.correctCount + poseeState.wrongCount;
+    const op = getOperatorSymbol();
 
     poseeEl.statCorrect.textContent = poseeState.correctCount;
     poseeEl.statWrong.textContent = poseeState.wrongCount;
 
     if (total === 0) {
-        poseeEl.resultsIcon.textContent = '👋';
-        poseeEl.resultsTitle.textContent = 'À bientôt !';
+        poseeEl.resultsIcon.textContent = '\uD83D\uDC4B';
+        poseeEl.resultsTitle.textContent = '\u00c0 bient\u00f4t !';
     } else if (poseeState.wrongCount === 0) {
-        poseeEl.resultsIcon.textContent = '🏆';
+        poseeEl.resultsIcon.textContent = '\uD83C\uDFC6';
         poseeEl.resultsTitle.textContent = 'Parfait !';
     } else if (poseeState.correctCount >= poseeState.wrongCount) {
-        poseeEl.resultsIcon.textContent = '👍';
-        poseeEl.resultsTitle.textContent = 'Bien joué !';
+        poseeEl.resultsIcon.textContent = '\uD83D\uDC4D';
+        poseeEl.resultsTitle.textContent = 'Bien jou\u00e9 !';
     } else {
-        poseeEl.resultsIcon.textContent = '💪';
+        poseeEl.resultsIcon.textContent = '\uD83D\uDCAA';
         poseeEl.resultsTitle.textContent = 'Continue !';
     }
 
@@ -754,7 +1109,7 @@ function showPoseeResults() {
         errors.forEach(e => {
             const span = document.createElement('span');
             span.className = 'error-item';
-            span.textContent = `${e.a} × ${e.b} = ${e.result}`;
+            span.textContent = `${e.a} ${op} ${e.b} = ${e.result}`;
             poseeEl.errorsList.appendChild(span);
         });
     } else {
@@ -765,7 +1120,7 @@ function showPoseeResults() {
 }
 
 poseeEl.btnReplay.addEventListener('click', () => {
-    showScreen('home');
+    showScreen('modes');
 });
 
 // ============================================================
@@ -796,6 +1151,7 @@ const multiEl = {
     player2Progress: document.getElementById('player2-progress'),
     multiNum1: document.getElementById('multi-num1'),
     multiNum2: document.getElementById('multi-num2'),
+    multiOperator: document.getElementById('multi-operator'),
     multiAnswerForm: document.getElementById('multi-answer-form'),
     multiAnswerInput: document.getElementById('multi-answer-input'),
     multiFeedback: document.getElementById('multi-feedback'),
@@ -809,7 +1165,6 @@ const multiEl = {
     btnPlayAgainMulti: document.getElementById('btn-play-again-multi')
 };
 
-// Navigate to multiplayer join screen
 multiEl.btnMulti.addEventListener('click', () => {
     showScreen('multiJoin');
     multiEl.playerName.focus();
@@ -820,10 +1175,9 @@ multiEl.btnBackHome.addEventListener('click', () => {
         multi.ws.close();
         multi.ws = null;
     }
-    showScreen('home');
+    showScreen('modes');
 });
 
-// Join game - use click instead of form submit (Safari buffers network during submit)
 function joinGame() {
     const name = multiEl.playerName.value.trim();
     if (!name) return;
@@ -843,49 +1197,41 @@ multiEl.playerName.addEventListener('keydown', (e) => {
 const waitingStatusEl = document.getElementById('waiting-status');
 
 function connectWebSocket(name) {
-    // Close any existing connection first
     if (multi.ws) {
         multi.ws.onclose = null;
         multi.ws.close();
         multi.ws = null;
     }
 
-    // Show waiting screen with "Connexion..." status
     multiEl.waitingName.textContent = name;
     waitingStatusEl.textContent = 'Connexion...';
     showScreen('multiWaiting');
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}/ws`;
-    console.log('[WS] connecting to', wsUrl);
     const ws = new WebSocket(wsUrl);
     multi.ws = ws;
 
     ws.onopen = () => {
-        console.log('[WS] connected, sending join');
         waitingStatusEl.textContent = '';
-        ws.send(JSON.stringify({ type: 'join', data: { name } }));
+        ws.send(JSON.stringify({ type: 'join', data: { name, operation: config.operation } }));
     };
 
     ws.onmessage = (event) => {
-        console.log('[WS] received:', event.data);
         const msg = JSON.parse(event.data);
         handleServerMessage(msg);
     };
 
-    ws.onerror = (err) => {
-        console.error('[WS] error:', err);
+    ws.onerror = () => {
         waitingStatusEl.textContent = 'Erreur de connexion';
     };
 
     ws.onclose = () => {
-        console.log('[WS] closed');
         multi.ws = null;
     };
 }
 
 function handleServerMessage(msg) {
-    console.log('[MSG] handling:', msg.type);
     switch (msg.type) {
         case 'waiting':
             multiEl.waitingName.textContent = multi.playerName;
@@ -893,7 +1239,6 @@ function handleServerMessage(msg) {
             break;
 
         case 'start':
-            console.log('[MSG] start received, opponent:', msg.opponent);
             multi.opponentName = msg.opponent;
             multi.myScore = 0;
             multi.opponentScore = 0;
@@ -930,6 +1275,7 @@ function startMultiRace(msg) {
     multiEl.player1Progress.style.width = '0%';
     multiEl.player2Progress.style.width = '0%';
 
+    multiEl.multiOperator.textContent = getOperatorSymbol();
     multiEl.multiNum1.textContent = msg.question.a;
     multiEl.multiNum2.textContent = msg.question.b;
 
@@ -937,11 +1283,8 @@ function startMultiRace(msg) {
     multiEl.multiFeedback.className = 'feedback';
 
     multiEl.multiAnswerInput.value = '';
-    console.log('[RACE] showing multiRace screen');
     showScreen('multiRace');
-    console.log('[RACE] multiRace screen active:', screens.multiRace.classList.contains('active'));
 
-    // Defer focus to next frame - Safari/iPad blocks .focus() outside user gestures
     requestAnimationFrame(() => {
         multiEl.multiAnswerInput.focus();
     });
@@ -1027,7 +1370,6 @@ function showOpponentLeft() {
     showScreen('multiWin');
 }
 
-// Multi answer submit
 multiEl.multiAnswerForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const answer = parseInt(multiEl.multiAnswerInput.value);
@@ -1036,11 +1378,10 @@ multiEl.multiAnswerForm.addEventListener('submit', (e) => {
     multi.ws.send(JSON.stringify({ type: 'answer', data: { answer } }));
 });
 
-// Play again multi
 multiEl.btnPlayAgainMulti.addEventListener('click', () => {
     if (multi.ws) {
         multi.ws.close();
         multi.ws = null;
     }
-    showScreen('home');
+    showScreen('modes');
 });

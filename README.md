@@ -1,28 +1,39 @@
 # 🧮 Chronomaths
 
-Application web ludique pour apprendre les tables de multiplication, destinée aux élèves de CE2.
+Application web ludique pour apprendre les multiplications et les additions, destinée aux élèves de CE2.
 
 ## Aperçu
 
-Chronomaths propose des sessions chronométrées de calcul mental où l'enfant doit résoudre des multiplications contre la montre. L'interface colorée et les animations rendent l'apprentissage amusant et motivant.
+Chronomaths propose des sessions chronométrées de calcul mental où l'enfant doit résoudre des multiplications ou des additions contre la montre. L'interface colorée et les animations rendent l'apprentissage amusant et motivant.
 
 ## Fonctionnalités
 
+### Choix de l'opération
+
+L'enfant commence par choisir l'opération qu'il souhaite travailler :
+- **Multiplications** (×) — Tables de 2 à 10
+- **Additions** (+) — Calcul mental avec difficulté mixte
+
 ### Modes de jeu
+
+Tous les modes sont disponibles pour les deux opérations.
 
 | Mode | Durée | Calculs | Difficulté |
 |------|-------|---------|------------|
 | 🚀 Sprint | 5 min | 24 | Rapide |
 | 🏃 Course | 10 min | 48 | Modéré |
 | 🏆 Marathon | 15 min | 72 | Endurance |
-| 📖 Révision par table | 2 min | 18 | Ciblé |
+| 📐 Opérations posées | — | 10 | 3 niveaux |
+| 📖 Révision par table/nombre | 2 min | 18 | Ciblé |
+| 🏁 Multi joueur | — | 20 pts | Course |
 
 ### Déroulement d'une partie
 
-1. **Choix du mode** : L'enfant sélectionne son défi (ou une table spécifique en mode Révision)
-2. **Calculs** : Les multiplications s'affichent une par une (tables de 2 à 10)
-3. **Feedback immédiat** : Chaque réponse est validée avec un retour visuel
-4. **Fin de partie** : Quand tous les calculs sont faits OU quand le temps est écoulé
+1. **Choix de l'opération** : Multiplications ou Additions
+2. **Choix du mode** : L'enfant sélectionne son défi (ou une table/nombre spécifique en mode Révision)
+3. **Calculs** : Les opérations s'affichent une par une
+4. **Feedback immédiat** : Chaque réponse est validée avec un retour visuel
+5. **Fin de partie** : Quand tous les calculs sont faits OU quand le temps est écoulé
 
 ### Écran de résultats
 
@@ -83,10 +94,11 @@ chronomaths/
 
 ### Backend (Go)
 
-Le serveur est minimaliste :
-- Utilise `embed.FS` pour embarquer les fichiers statiques dans le binaire
-- Sert les fichiers via `http.FileServer`
-- Aucune dépendance externe
+Le serveur gère les fichiers statiques et le mode multijoueur via WebSocket :
+- `embed.FS` pour embarquer les fichiers statiques dans le binaire
+- `http.FileServer` pour servir les fichiers
+- WebSocket (`gorilla/websocket`) pour le multijoueur temps réel
+- Support des deux opérations (multiplication et addition) côté serveur
 - Port par défaut : 8080
 
 ```go
@@ -100,13 +112,14 @@ var staticFiles embed.FS
 
 | Fichier | Rôle |
 |---------|------|
-| `index.html` | 3 écrans : accueil, jeu, résultats |
+| `index.html` | Écrans : accueil, modes, jeu, résultats, posée, multi |
 | `style.css` | Variables CSS, responsive, animations |
-| `app.js` | Machine à états, génération des questions, timer |
+| `app.js` | Machine à états, génération questions (× et +), timer |
 
 #### Génération des questions
 
-Les multiplications sont générées aléatoirement parmi toutes les combinaisons des tables de 2 à 10 (81 combinaisons possibles). L'algorithme Fisher-Yates assure un mélange équitable.
+- **Multiplications** : générées aléatoirement parmi les tables de 2 à 10 (81 combinaisons). Mélange Fisher-Yates.
+- **Additions** : difficulté mixte — 20% facile (2-20 + 2-20), 50% moyen (10-99 + 2-50), 30% difficile (50-99 + 50-99).
 
 #### Gestion du temps
 
