@@ -51,6 +51,7 @@ Tous les modes sont disponibles pour les quatre opérations (sauf opérations po
 - Alertes visuelles pour le temps (orange < 1 min, rouge < 30 sec)
 - Barre de progression
 - Responsive : fonctionne sur ordinateur, tablette et téléphone
+- **Progressive Web App** : installable sur l'écran d'accueil, fonctionne hors ligne (modes solo)
 
 ## Installation
 
@@ -91,7 +92,10 @@ chronomaths/
 └── static/
     ├── index.html       # Structure HTML
     ├── style.css        # Styles CSS
-    └── app.js           # Logique JavaScript
+    ├── app.js           # Logique JavaScript
+    ├── manifest.json    # Web App Manifest (PWA)
+    ├── sw.js            # Service Worker
+    └── icon.svg         # Icône application
 ```
 
 ### Backend (Go)

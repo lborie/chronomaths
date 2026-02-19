@@ -1,0 +1,24 @@
+{
+  "name": "Chronomaths - Calcul mental",
+  "short_name": "Chronomaths",
+  "description": "Apprends les 4 opérations avec des sessions chronométrées de calcul mental !",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#a29bfe",
+  "theme_color": "#a29bfe",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
