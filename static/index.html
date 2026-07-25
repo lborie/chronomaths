@@ -13,6 +13,7 @@
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="games.css">
 </head>
 <body>
     <div class="container">
@@ -48,6 +49,19 @@
                         <span class="operation-desc">Tables de 2 à 10</span>
                     </button>
                 </div>
+
+                <div class="multi-separator">
+                    <span>ou</span>
+                </div>
+
+                <button id="btn-games" class="multi-btn games-entry-btn">
+                    <span class="multi-icon">🎮</span>
+                    <span class="multi-text">
+                        <span class="multi-title">Jeux</span>
+                        <span class="multi-details">Une pause détente entre deux séries de calculs</span>
+                    </span>
+                    <span class="multi-arrow">→</span>
+                </button>
             </div>
         </div>
 
@@ -435,9 +449,54 @@
                 <span>🔄</span> Rejouer
             </button>
         </div>
+
+        <!-- Écran hub Jeux -->
+        <div id="screen-games" class="screen">
+            <h1 class="title">
+                <span class="emoji">🎮</span>
+                Jeux
+                <span class="emoji">🕹️</span>
+            </h1>
+            <p class="subtitle">Choisis ton jeu !</p>
+
+            <div class="mode-selection">
+                <button id="btn-connect4" class="multi-btn c4-entry-btn">
+                    <span class="multi-icon">🔴</span>
+                    <span class="multi-text">
+                        <span class="multi-title">Puissance 4</span>
+                        <span class="multi-details">2 joueurs, chacun son tour, sur le même écran</span>
+                    </span>
+                    <span class="multi-arrow">→</span>
+                </button>
+
+                <button id="btn-games-back" class="back-btn" style="margin-top:1rem;">← Retour</button>
+            </div>
+        </div>
+
+        <!-- Écran Puissance 4 -->
+        <div id="screen-connect4" class="screen">
+            <div class="c4-container">
+                <div class="c4-header">
+                    <h2 class="c4-title">🔴 Puissance 4 🟡</h2>
+                    <p id="c4-score" class="c4-score">Rouge 0 – 0 Jaune</p>
+                </div>
+
+                <p id="c4-turn" class="c4-turn" aria-live="polite">🔴 À Rouge de jouer</p>
+
+                <div id="c4-board" class="c4-board"></div>
+
+                <div class="c4-actions">
+                    <button id="btn-c4-replay" class="play-again-btn">
+                        <span>🔄</span> Nouvelle partie
+                    </button>
+                    <button id="btn-c4-back" class="back-btn">← Retour</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
+    <script src="games.js"></script>
     <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js');

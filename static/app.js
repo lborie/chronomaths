@@ -45,6 +45,10 @@ const screens = {
     multiWin: document.getElementById('screen-multi-win')
 };
 
+// Registre de nettoyage extensible : les écrans définis hors de ce fichier
+// (jeux) y enregistrent leur propre fonction de nettoyage.
+const screenCleanups = {};
+
 const elements = {
     timerDisplay: document.getElementById('timer-display'),
     timer: document.querySelector('.timer'),
@@ -290,6 +294,7 @@ function getActiveScreen() {
 }
 
 function cleanupScreen(screenName) {
+    if (screenCleanups[screenName]) screenCleanups[screenName]();
     switch (screenName) {
         case 'game':
             clearInterval(state.timerInterval);

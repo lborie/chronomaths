@@ -37,6 +37,22 @@ Tous les modes sont disponibles pour les quatre opérations (sauf opérations po
 4. **Feedback immédiat** : Chaque réponse est validée avec un retour visuel
 5. **Fin de partie** : Quand tous les calculs sont faits OU quand le temps est écoulé
 
+### 🎮 Jeux
+
+Une section détente, accessible depuis l'accueil via le bouton **🎮 Jeux**.
+
+#### Puissance 4
+
+Deux joueurs s'affrontent **sur le même appareil**, chacun son tour.
+
+- 🔴 **Rouge** commence la première partie, 🟡 **Jaune** joue en second.
+- On clique (ou on touche) une colonne pour y laisser tomber son jeton.
+- Le premier à aligner **4 jetons** — horizontalement, verticalement ou en diagonale — gagne : l'alignement gagnant se met à clignoter.
+- Si le plateau se remplit sans alignement, c'est **match nul**.
+- Le **score des manches** est conservé tant qu'on reste sur l'écran, et le joueur qui commence alterne à chaque nouvelle partie.
+
+Aucun calcul n'est demandé : c'est une récompense entre deux séries d'entraînement.
+
 ### Écran de résultats
 
 - ✅ Nombre de bonnes réponses
@@ -92,7 +108,9 @@ chronomaths/
 └── static/
     ├── index.html       # Structure HTML
     ├── style.css        # Styles CSS
+    ├── games.css        # Styles du hub Jeux et du Puissance 4
     ├── app.js           # Logique JavaScript
+    ├── games.js         # Section Jeux : logique pure + rendu du Puissance 4
     ├── manifest.json    # Web App Manifest (PWA)
     ├── sw.js            # Service Worker
     └── icon.svg         # Icône application
@@ -120,9 +138,13 @@ var staticFiles embed.FS
 
 | Fichier | Rôle |
 |---------|------|
-| `index.html` | Écrans : accueil, modes, jeu, résultats, posée, multi |
+| `index.html` | Écrans : accueil, modes, jeu, résultats, posée, multi, jeux |
 | `style.css` | Variables CSS, responsive, animations |
+| `games.css` | Styles du hub Jeux et du plateau Puissance 4 |
 | `app.js` | Machine à états, génération questions (+, −, ×, ÷), timer |
+| `games.js` | Puissance 4 : logique pure (sans DOM) + rendu et interactions |
+
+`games.css` et `games.js` sont chargés **après** `style.css` et `app.js` : ce sont des scripts classiques, et `games.js` résout `screens`, `showScreen` et `screenCleanups` par portée lexicale globale.
 
 #### Génération des questions
 
