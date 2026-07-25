@@ -201,10 +201,41 @@ function playC4Move(col) {
     c4.locked = true;
     placeC4Disc(row, col, player);
 
+    const win = findWin(c4.board, row, col);
+    const draw = !win && isDraw(c4.board);
+
     c4.dropTimer = setTimeout(() => {
         c4.dropTimer = null;
-        c4.current = player === 1 ? 2 : 1;
-        c4.locked = false;
-        updateC4Turn();
+
+        if (win) {
+            c4.over = true;
+            c4.wins[player]++;
+            highlightC4Win(win);
+            const p = C4_PLAYERS[player];
+            showC4End(`🏆 ${p.emoji} ${p.name} gagne !`);
+        } else if (draw) {
+            c4.over = true;
+            showC4End('🤝 Match nul !');
+        } else {
+            c4.current = player === 1 ? 2 : 1;
+            c4.locked = false;
+            updateC4Turn();
+        }
     }, C4_DROP_MS);
+}
+
+function highlightC4Win(cells) {
+    cells.forEach(({ row, col }) => {
+        const disc = c4El.board.querySelector(
+            `.c4-cell[data-row="${row}"][data-col="${col}"] .c4-disc`
+        );
+        if (disc) disc.classList.add('c4-disc-win');
+    });
+}
+
+function showC4End(text) {
+    c4El.turn.textContent = text;
+    c4El.turn.className = 'c4-turn c4-turn-over';
+    c4El.board.className = 'c4-board'; // retire la teinte de survol
+    updateC4Score();
 }
