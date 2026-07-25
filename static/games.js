@@ -137,7 +137,74 @@ function startC4Round() {
     updateC4Score();
 }
 
-// Rendu et interactions : implémentés en Task 3.
-function renderC4Board() {}
-function updateC4Turn() {}
-function updateC4Score() {}
+// ============================================================
+// RENDU
+// ============================================================
+
+// Durée de la chute, alignée sur l'animation c4Drop de games.css.
+const C4_DROP_MS = 350;
+
+function renderC4Board() {
+    c4El.board.textContent = '';
+    for (let col = 0; col < C4_COLS; col++) {
+        const colEl = document.createElement('button');
+        colEl.type = 'button';
+        colEl.className = 'c4-col';
+        colEl.dataset.col = col;
+        colEl.setAttribute('aria-label', `Colonne ${col + 1}`);
+
+        for (let row = 0; row < C4_ROWS; row++) {
+            const cell = document.createElement('div');
+            cell.className = 'c4-cell';
+            cell.dataset.row = row;
+            cell.dataset.col = col;
+            colEl.appendChild(cell);
+        }
+
+        colEl.addEventListener('click', () => playC4Move(col));
+        c4El.board.appendChild(colEl);
+    }
+}
+
+function updateC4Turn() {
+    const p = C4_PLAYERS[c4.current];
+    c4El.turn.textContent = `${p.emoji} À ${p.name} de jouer`;
+    c4El.turn.className = `c4-turn c4-turn-p${c4.current}`;
+    c4El.board.className = `c4-board c4-hint-p${c4.current}`;
+}
+
+function updateC4Score() {
+    c4El.score.textContent = `🔴 Rouge ${c4.wins[1]} – ${c4.wins[2]} Jaune 🟡`;
+}
+
+function placeC4Disc(row, col, player) {
+    const cell = c4El.board.querySelector(`.c4-cell[data-row="${row}"][data-col="${col}"]`);
+    if (!cell) return;
+    const disc = document.createElement('div');
+    disc.className = `c4-disc c4-p${player}`;
+    // Hauteur de chute : nombre de cases parcourues depuis le haut du plateau.
+    disc.style.setProperty('--c4-fall', row + 1);
+    cell.appendChild(disc);
+}
+
+// ============================================================
+// COUPS
+// ============================================================
+
+function playC4Move(col) {
+    if (c4.locked || c4.over) return;
+
+    const row = dropDisc(c4.board, col, c4.current);
+    if (row === -1) return; // colonne pleine : coup ignoré, le tour ne change pas
+
+    const player = c4.current;
+    c4.locked = true;
+    placeC4Disc(row, col, player);
+
+    c4.dropTimer = setTimeout(() => {
+        c4.dropTimer = null;
+        c4.current = player === 1 ? 2 : 1;
+        c4.locked = false;
+        updateC4Turn();
+    }, C4_DROP_MS);
+}

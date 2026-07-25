@@ -19,3 +19,132 @@
     border-color: var(--purple);
     background: linear-gradient(135deg, #f8f4ff, #f1e9ff);
 }
+
+/* ============================================================
+   PUISSANCE 4 — plateau
+   ============================================================ */
+.c4-container {
+    background: var(--card-bg);
+    border-radius: 1.5rem;
+    padding: clamp(0.75rem, 3vw, 1.5rem);
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(10px);
+}
+
+.c4-header {
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+
+.c4-title {
+    color: var(--text);
+    font-size: clamp(1.2rem, 5vw, 1.6rem);
+}
+
+.c4-score {
+    margin-top: 0.25rem;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.c4-turn {
+    text-align: center;
+    font-size: clamp(1rem, 4.5vw, 1.25rem);
+    font-weight: 700;
+    padding: 0.6rem;
+    border-radius: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--primary-light);
+    color: var(--text);
+    transition: background 0.25s;
+}
+
+.c4-turn-p1 { background: #ffe0e3; color: var(--c4-red-dark); }
+.c4-turn-p2 { background: #fff5d6; color: var(--c4-yellow-dark); }
+.c4-turn-over { background: var(--success-light); color: #14713a; }
+
+.c4-board {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: clamp(3px, 1.2vw, 8px);
+    padding: clamp(4px, 1.5vw, 10px);
+    max-width: 420px;
+    margin: 0 auto;
+    background: linear-gradient(160deg, var(--c4-board), var(--c4-board-dark));
+    border-radius: 0.9rem;
+    box-shadow: 0 10px 24px rgba(59, 83, 176, 0.35);
+}
+
+.c4-col {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: clamp(3px, 1.2vw, 8px);
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+}
+
+.c4-col:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+
+.c4-cell {
+    aspect-ratio: 1;
+    background: var(--c4-hole);
+    border-radius: 50%;
+    box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.22);
+}
+
+.c4-disc {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-shadow:
+        inset 0 -3px 6px rgba(0, 0, 0, 0.25),
+        0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: c4Drop 0.35s cubic-bezier(0.5, 0, 0.75, 0.4);
+}
+
+.c4-p1 { background: radial-gradient(circle at 35% 30%, #ff8a93, var(--c4-red)); }
+.c4-p2 { background: radial-gradient(circle at 35% 30%, #ffe6a1, var(--c4-yellow)); }
+
+@keyframes c4Drop {
+    from { transform: translateY(calc(var(--c4-fall, 1) * -115%)); }
+    to   { transform: translateY(0); }
+}
+
+.c4-actions {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.c4-actions .back-btn {
+    min-height: 44px;
+}
+
+/* ============================================================
+   HOVER — pointeur fin uniquement (jamais sur tactile)
+   ============================================================ */
+@media (hover: hover) and (pointer: fine) {
+    .games-entry-btn:hover,
+    .c4-entry-btn:hover {
+        border-color: var(--purple);
+        transform: translateX(5px) scale(1.02);
+        box-shadow: 0 8px 25px rgba(165, 94, 234, 0.35);
+    }
+
+    .c4-hint-p1 .c4-col:hover { background: rgba(255, 71, 87, 0.30); }
+    .c4-hint-p2 .c4-col:hover { background: rgba(255, 201, 60, 0.35); }
+}
