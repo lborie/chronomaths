@@ -101,7 +101,7 @@ Regroupées en tête de `games.js`, sans aucun accès au DOM. Représentation : 
 |---|---|
 | `createBoard()` | Retourne une grille 6×7 remplie de `0`. |
 | `dropDisc(board, col, player)` | Écrit `player` dans la case libre la plus basse de `col` et retourne son index de ligne. Retourne `-1` si la colonne est pleine (le plateau n'est alors pas modifié). |
-| `findWin(board, row, col)` | À partir du dernier jeton posé, teste les 4 directions (horizontale, verticale, 2 diagonales). Retourne le tableau des 4 cellules alignées `[{row, col}, …]`, ou `null`. Si plus de 4 jetons sont alignés, retourne les 4 premières trouvées dans le sens du parcours. |
+| `findWin(board, row, col)` | À partir du dernier jeton posé, teste les 4 directions (horizontale, verticale, 2 diagonales). Retourne le tableau de **toutes** les cellules alignées `[{row, col}, …]` (4 ou plus), ou `null`. Un alignement de 5+ est mis en évidence en entier. |
 | `isDraw(board)` | `true` si la ligne du haut (`board[0]`) ne contient plus aucun `0`. |
 
 Ces quatre fonctions constituent l'unité portable : un futur mode en ligne les transpose en Go côté serveur sans toucher au rendu.
@@ -148,11 +148,11 @@ La **cible de clic est la colonne entière**, pas la cellule. À 320 px de viewp
 |---|---|
 | Bandeau de tour | `🔴 À Rouge de jouer` / `🟡 À Jaune de jouer`, avec la couleur du joueur courant |
 | Score de manches | `Rouge 2 – 1 Jaune`, mis à jour en fin de partie |
-| Aperçu de colonne | Jeton fantôme en haut de la colonne survolée, **uniquement sous `@media (hover: hover)`** |
+| Aperçu de colonne | La colonne survolée se teinte de la couleur du joueur courant, **uniquement sous `@media (hover: hover) and (pointer: fine)`**. Teinte pilotée par une classe `c4-hint-p1` / `c4-hint-p2` sur le plateau, donc 100 % CSS (pas de calcul JS de la case d'atterrissage) |
 | Chute du jeton | Animation `translateY` ~350 ms ; plateau verrouillé (`c4.locked`) pendant la chute |
 | Victoire | Les 4 jetons alignés pulsent ; bandeau `🏆 Rouge gagne !` |
 | Match nul | Bandeau `🤝 Match nul !` |
-| Fin de partie | Boutons `🔄 Rejouer` et `← Retour` |
+| Actions | Boutons `🔄 Nouvelle partie` et `← Retour`, **toujours visibles** (pas de bascule d'affichage) : une partie peut aussi être relancée en cours de route |
 
 `prefers-reduced-motion: reduce` neutralise la chute et la pulsation : le jeton apparaît directement à sa place, la victoire est signalée par un contour statique.
 
@@ -160,8 +160,12 @@ La **cible de clic est la colonne entière**, pas la cellule. À 320 px de viewp
 
 - Clic sur une colonne pleine : sans effet, aucun changement de tour.
 - Clic pendant l'animation ou après la fin de partie (`c4.locked`) : ignoré.
-- Après une victoire ou un nul, `wins` est incrémenté (victoire seulement) et le plateau reste affiché jusqu'au « Rejouer ».
-- « Rejouer » : `starter` bascule (1 ↔ 2), `current = starter`, nouveau plateau, `wins` conservé.
+- Après une victoire ou un nul, `wins` est incrémenté (victoire seulement) et le plateau reste affiché jusqu'à « Nouvelle partie ».
+- « Nouvelle partie » : `starter` bascule (1 ↔ 2), `current = starter`, nouveau plateau, `wins` conservé.
+
+## Testabilité de la logique pure
+
+Les fonctions pures occupent le premier bloc de `games.js`, sous une bannière de commentaire au format maison, et sont suivies de la bannière `// PUISSANCE 4 — ÉTAT & RENDU`. Le script de vérification `node` tronque la source à cet index et évalue le préfixe : il obtient les 4 fonctions sans jamais toucher au DOM, sans marqueur artificiel ni fichier supplémentaire.
 
 ## Service Worker
 
