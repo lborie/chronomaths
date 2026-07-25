@@ -1,0 +1,21 @@
+/* ============================================================
+   JEUX — variables communes
+   ============================================================ */
+:root {
+    --c4-red: #ff4757;
+    --c4-red-dark: #c0392b;
+    --c4-yellow: #ffc93c;
+    --c4-yellow-dark: #a67c00;
+    --c4-board: #4a69dd;
+    --c4-board-dark: #3b53b0;
+    --c4-hole: #eef2ff;
+}
+
+/* ============================================================
+   HUB JEUX — boutons d'entrée
+   ============================================================ */
+.games-entry-btn,
+.c4-entry-btn {
+    border-color: var(--purple);
+    background: linear-gradient(135deg, #f8f4ff, #f1e9ff);
+}
