@@ -17,7 +17,8 @@
 - **Aucun nouveau fichier statique** : la liste de precache de `sw.js` reste `['/', '/index.html', '/style.css', '/games.css', '/app.js', '/games.js', '/icon.svg', '/manifest.json']`.
 - **Toute tâche qui modifie `static/` bump `CACHE_NAME` dans `static/sw.js`.** Valeur de départ : `chronomaths-v2`. Version cible imposée par tâche : T2 → `chronomaths-v3`, T3 → `chronomaths-v4`, T4 → `chronomaths-v5`, T6 → `chronomaths-v6`, T7 → `chronomaths-v7`, T8 → `chronomaths-v8` (uniquement si T8 touche `static/`).
 - **Langue** : UI en français (accents obligatoires), code et identifiants en anglais, commentaires en français.
-- **Vérification manuelle après toute modification de `static/`** : `//go:embed` fige les fichiers à la compilation → redémarrer `go run main.go`, puis purger le cache (DevTools → Application → Storage → *Clear site data*) car le Service Worker sert en cache-first.
+- **Commande de lancement : `go run .`, jamais `go run main.go`.** À partir de la tâche 2, le paquet `main` est réparti sur plusieurs fichiers ; `go run main.go` ne compile que ce fichier et échoue sur `undefined: handleJoinHTTP`. `CLAUDE.md` et `README.md` documentent encore l'ancienne forme : la tâche 2 les corrige.
+- **Vérification manuelle après toute modification de `static/`** : `//go:embed` fige les fichiers à la compilation → redémarrer `go run .`, puis purger le cache (DevTools → Application → Storage → *Clear site data*) car le Service Worker sert en cache-first.
 - **`.operation-card` est interdite** hors des 4 cartes d'opération : elle est bindée vers `config.operation` et fait planter `updateModesScreen()`. Les boutons du hub Jeux utilisent `.multi-btn`.
 - **Aucun changement fonctionnel de la course de fusées** : barème +1 / −3 (plancher 0), victoire à 20, mêmes noms et champs d'events (`waiting`, `start`, `scoreUpdate`, `opponentScore`, `win`, `opponentLeft`).
 - **Discipline de verrous** : le matchmaking résout la room sous `globalMu`, relâche `globalMu`, puis appelle le jeu ; les callbacks `Game` s'exécutent sous `room.mu` seul.
@@ -1306,7 +1307,7 @@ const CACHE_NAME = 'chronomaths-v3';
 - [ ] **Step 8 : Vérifier à la main que la course de fusées est intacte**
 
 ```bash
-go run main.go
+go run .
 ```
 
 Ouvrir `http://localhost:8080` dans deux onglets, purger le cache (DevTools → Application → Storage → *Clear site data*) puis recharger. Dans chaque onglet : choisir la même opération → « Multi Joueur » → un prénom → Rejoindre.
@@ -1573,7 +1574,7 @@ Expected: aucune ligne.
 - [ ] **Step 6 : Vérifier à la main la course de fusées**
 
 ```bash
-go run main.go
+go run .
 ```
 
 Purger le cache, puis rejouer le scénario complet à deux onglets : attente, départ, bonne et mauvaise réponse, victoire à 20, bouton « Rejouer », fermeture d'un onglet (« Adversaire déconnecté »), et **navigation arrière du navigateur** depuis l'écran de course (attendu : retour sans erreur console, flux SSE fermé — vérifier dans l'onglet Network que la requête `events` passe à `canceled`).
@@ -1826,7 +1827,7 @@ Expected: aucune ligne.
 - [ ] **Step 7 : Vérifier à la main**
 
 ```bash
-go run main.go
+go run .
 ```
 
 Purger le cache. Vérifier : le titre de l'écran « rejoindre » est bien `🎮 Multi Joueur 🚀` / « Course de fusées ! » ; « ← Retour » ramène à Modes ; sur l'écran d'attente, « ← Annuler » ramène à Modes et **la requête `events` passe à `canceled`** dans l'onglet Network ; le scénario complet à deux onglets fonctionne toujours ; le prénom saisi est conservé d'un join au suivant.
@@ -2372,7 +2373,7 @@ Expected: `gofmt` et `go vet` silencieux ; tous les tests `PASS`, y compris ceux
 - [ ] **Step 6 : Vérifier le refus des demandes invalides sur le nouveau jeu**
 
 ```bash
-go run main.go
+go run .
 ```
 
 Dans un autre terminal :
@@ -2706,7 +2707,7 @@ Expected: aucune ligne.
 - [ ] **Step 8 : Vérifier à la main le Puissance 4 local**
 
 ```bash
-go run main.go
+go run .
 ```
 
 Purger le cache. Accueil → 🎮 Jeux → Puissance 4. Vérifier :
@@ -3021,7 +3022,7 @@ const CACHE_NAME = 'chronomaths-v7';
 - [ ] **Step 8 : Vérifier à la main le mode en ligne**
 
 ```bash
-go run main.go
+go run .
 ```
 
 Purger le cache dans les deux onglets. Dans chacun : Accueil → 🎮 Jeux → 🌍 Puissance 4 en ligne → un prénom (« Ludo » puis « Léa ») → Rejoindre.
