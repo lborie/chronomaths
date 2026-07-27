@@ -22,6 +22,7 @@
 - **Aucun changement fonctionnel de la course de fusées** : barème +1 / −3 (plancher 0), victoire à 20, mêmes noms et champs d'events (`waiting`, `start`, `scoreUpdate`, `opponentScore`, `win`, `opponentLeft`).
 - **Discipline de verrous** : le matchmaking résout la room sous `globalMu`, relâche `globalMu`, puis appelle le jeu ; les callbacks `Game` s'exécutent sous `room.mu` seul.
 - Avant chaque commit touchant du Go : `gofmt -l .` (doit ne rien afficher), `go vet ./...`, `go test ./...`.
+- **Qui vérifie quoi.** Les tâches 1, 2 et 5 sont vérifiables par `go test` : leur exécutant les lance et rapporte la sortie. Les tâches 3, 4, 6, 7 et 8 ont pour critère d'acceptation un **scénario navigateur** (deux onglets, purge de cache, inspection de la console et du réseau). Un exécutant sans navigateur ne doit **jamais** cocher ces étapes ni écrire « vérifié » : il livre le code, lance les `grep` de non-régression qui sont à sa portée, et signale explicitement que la vérification navigateur reste à faire. Le scénario est alors déroulé par l'orchestrateur avant d'approuver la tâche.
 
 ---
 
@@ -2354,12 +2355,21 @@ func c4AskRematch(r *Room, s *c4Room, p *Player) {
 }
 ```
 
-- [ ] **Step 4 : Lancer les tests pour vérifier qu'ils passent**
+- [ ] **Step 4 : Mesurer d'abord le test de match nul**
+
+`c4FillNoWin` fait une recherche avec retour arrière : correcte et déterministe, mais son temps d'exécution n'est pas connu à l'avance.
+
+Run: `go test ./... -run TestC4OnlineDrawEndsRound -v`
+Expected: `PASS` en moins d'une seconde (`go test` affiche le temps du test).
+
+Si le test dépasse quelques secondes, remplacer la recherche par le plateau qu'elle trouve, une fois pour toutes : ajouter temporairement `t.Logf("%v", full)` dans le test, relever la valeur, et remplacer le corps de `c4FillNoWin` par ce littéral `C4Board{...}` (en gardant le nom de la fonction et la vérification `c4FindWin` sur chaque case, en boucle, pour que le littéral reste auto-contrôlé). Déterministe et instantané.
+
+- [ ] **Step 5 : Lancer toute la suite pour vérifier qu'elle passe**
 
 Run: `gofmt -l . && go vet ./... && go test ./... -v`
 Expected: `gofmt` et `go vet` silencieux ; tous les tests `PASS`, y compris ceux des tâches 1 et 2.
 
-- [ ] **Step 5 : Vérifier le refus des demandes invalides sur le nouveau jeu**
+- [ ] **Step 6 : Vérifier le refus des demandes invalides sur le nouveau jeu**
 
 ```bash
 go run main.go
@@ -2378,7 +2388,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/api/join \
 
 Attendu : `200`, `200` (l'`operation` est ignorée par `connect4`), `400`.
 
-- [ ] **Step 6 : Commit**
+- [ ] **Step 7 : Commit**
 
 ```bash
 git add connect4.go connect4_test.go
@@ -2506,6 +2516,13 @@ function c4DropMs() {
 //   playable : colonnes cliquables
 //   hint     : couleur de l'indice de survol (1 ou 2), 0 pour aucun
 function renderC4Snapshot(board, { lastMove, line, playable, hint }) {
+    // La grille est reconstruite entièrement : mémoriser la colonne au clavier
+    // pour la rendre, sinon chaque coup éjecterait le focus vers <body>.
+    const focused = document.activeElement;
+    const focusCol = focused && focused.classList.contains('c4-col')
+        ? focused.dataset.col
+        : null;
+
     c4El.board.textContent = '';
     c4El.board.className = hint ? `c4-board c4-hint-p${hint}` : 'c4-board';
 
@@ -2540,6 +2557,11 @@ function renderC4Snapshot(board, { lastMove, line, playable, hint }) {
 
         colEl.addEventListener('click', () => playC4Column(col));
         c4El.board.appendChild(colEl);
+    }
+
+    if (focusCol !== null) {
+        const target = c4El.board.querySelector(`.c4-col[data-col="${focusCol}"]:not(:disabled)`);
+        if (target) target.focus();
     }
 }
 
@@ -2693,6 +2715,7 @@ Purger le cache. Accueil → 🎮 Jeux → Puissance 4. Vérifier :
 - l'alignement gagnant clignote, le libellé de tour passe en vert, le score de manches s'incrémente ;
 - « Nouvelle partie » remet un plateau vierge, alterne le joueur qui commence, conserve le score ;
 - une colonne pleine ignore le clic sans changer le tour ;
+- **au clavier** : Tab jusqu'à une colonne, Entrée pour jouer, et le focus reste sur cette colonne après la chute — le vérifier avec `document.activeElement.dataset.col` dans la console juste après le coup (la grille est reconstruite à chaque rendu, c'est la régression que la restitution de focus évite) ;
 - le match nul s'affiche en remplissant tout le plateau ;
 - « ← Retour » puis retour au jeu repart d'une rencontre neuve (score 0–0) ;
 - la navigation arrière du navigateur depuis le plateau ne laisse aucune erreur en console.
@@ -3073,7 +3096,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/api/join \
 curl -s -o /dev/null -w '%{http_code}\n' 'localhost:8080/api/events?playerId=nawak'
 ```
 
-Attendu : `400`, `400`, `400`, `400` (corps tronqué par `MaxBytesReader`), `404`.
+Attendu : `400`, `400`, `400`, puis `400` **ou** `413` pour le corps géant (`http.MaxBytesReader` peut renvoyer un `*MaxBytesError` et marquer la réponse avant que le handler n'écrive — les deux codes sont un refus correct), et `404`.
 
 Vérifier enfin dans un onglet en ligne, via DevTools → Network, qu'aucune réponse ne contient le `playerId` de l'adversaire (les snapshots ne portent que des noms, des couleurs et des cases).
 
@@ -3087,6 +3110,7 @@ Avec DevTools, en 320 px de large, en 390 px, et en paysage 740×360 :
 - chaque `.c4-col` mesure au moins 44 px de large — le mesurer dans la console : `[...document.querySelectorAll('.c4-col')].map(c => c.getBoundingClientRect().width)` ; si une valeur descend sous 44, réduire le `padding` du `.c4-board` ou plafonner sa largeur, et **ne pas** réduire les cellules ;
 - les boutons « ← Annuler », « Nouvelle manche » et « ← Retour » font au moins 44 px de haut ;
 - l'indice de survol des colonnes n'apparaît pas au toucher (device toolbar en mode tactile) et n'apparaît pas sur une colonne désactivée ;
+- navigation au clavier : le focus survit à un coup en local **et** à un coup adverse en ligne — sauf quand ce n'est pas son tour, où les 7 colonnes sont `disabled` et où le focus part légitimement du plateau ; vérifier qu'il y revient dès que le tour revient ;
 - avec *Emulate CSS prefers-reduced-motion* : ni chute, ni clignotement de la ligne gagnante, ni attente avant l'affichage de la fin de manche ;
 - la safe-area est respectée en bas d'écran sur un profil iPhone (le bouton « ← Retour » reste atteignable) ;
 - `grep -n "background-attachment: fixed" static/*.css` ne retourne rien.
