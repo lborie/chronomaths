@@ -90,7 +90,7 @@ go build -o chronomaths .
 
 ```bash
 # Avec go run
-go run main.go
+go run .
 
 # Ou avec le binaire
 ./chronomaths
@@ -122,7 +122,7 @@ Le serveur gère les fichiers statiques et le mode multijoueur via SSE (Server-S
 - `embed.FS` pour embarquer les fichiers statiques dans le binaire
 - `http.FileServer` pour servir les fichiers
 - SSE (`GET /api/events`) pour les mises à jour serveur→client en temps réel
-- `POST /api/join` et `POST /api/answer` pour les actions client→serveur
+- `POST /api/join` et `POST /api/action` pour les actions client→serveur
 - Support des quatre opérations (addition, soustraction, multiplication, division) côté serveur
 - Zéro dépendance externe (standard library uniquement)
 - Port par défaut : 8080

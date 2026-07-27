@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 )
 
@@ -87,6 +88,7 @@ func (raceGame) Action(r *Room, p *Player, raw json.RawMessage) {
 		Answer int `json:"answer"`
 	}
 	if err := json.Unmarshal(raw, &d); err != nil {
+		log.Printf("[RACE] action illisible de %s: %v", p.Name, err)
 		return
 	}
 

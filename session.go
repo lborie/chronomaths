@@ -285,12 +285,15 @@ func handleActionHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room.mu.Lock()
-	started := room.started
-	if started {
+	started := func() bool {
+		room.mu.Lock()
+		defer room.mu.Unlock()
+		if !room.started {
+			return false
+		}
 		room.Game.Action(room, player, raw)
-	}
-	room.mu.Unlock()
+		return true
+	}()
 
 	if !started {
 		http.Error(w, "not in game", http.StatusBadRequest)

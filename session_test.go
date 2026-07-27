@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -190,31 +192,37 @@ func TestRaceScoring(t *testing.T) {
 	json.Unmarshal(expectEvent(t, p0, "start"), &start)
 	expectEvent(t, p1, "start")
 
-	// Bonne réponse : +1 pour l'auteur, notification à l'adversaire.
-	act(t, r, p0, map[string]int{"answer": start.Question.Answer})
+	// Quatre bonnes réponses : +1 à chaque fois, notification à l'adversaire.
+	answer := start.Question.Answer
 	var upd struct {
 		YourScore     int      `json:"yourScore"`
 		OpponentScore int      `json:"opponentScore"`
 		Correct       bool     `json:"correct"`
 		Question      Question `json:"question"`
 	}
-	json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
-	if !upd.Correct || upd.YourScore != 1 || upd.OpponentScore != 0 {
-		t.Fatalf("scoreUpdate = %+v", upd)
-	}
-	var opp struct {
-		OpponentScore int `json:"opponentScore"`
-	}
-	json.Unmarshal(expectEvent(t, p1, "opponentScore"), &opp)
-	if opp.OpponentScore != 1 {
-		t.Fatalf("opponentScore = %d, attendu 1", opp.OpponentScore)
+	for i := 1; i <= 4; i++ {
+		act(t, r, p0, map[string]int{"answer": answer})
+		json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
+		if !upd.Correct || upd.YourScore != i || upd.OpponentScore != 0 {
+			t.Fatalf("après %d bonne(s) réponse(s), scoreUpdate = %+v", i, upd)
+		}
+		var opp struct {
+			OpponentScore int `json:"opponentScore"`
+		}
+		json.Unmarshal(expectEvent(t, p1, "opponentScore"), &opp)
+		if opp.OpponentScore != i {
+			t.Fatalf("opponentScore = %d, attendu %d", opp.OpponentScore, i)
+		}
+		answer = upd.Question.Answer
 	}
 
-	// Mauvaise réponse : -3, plancher à 0.
-	act(t, r, p0, map[string]int{"answer": upd.Question.Answer + 1})
+	// Mauvaise réponse depuis un score de 4 : 4 - 3 = 1 pile, ce qui pin
+	// la valeur exacte de penaltyPoints (un plancher à 0 masquerait toute
+	// valeur de pénalité >= 4).
+	act(t, r, p0, map[string]int{"answer": answer + 1})
 	json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
-	if upd.Correct || upd.YourScore != 0 {
-		t.Fatalf("plancher du score non respecté: %+v", upd)
+	if upd.Correct || upd.YourScore != 1 {
+		t.Fatalf("pénalité incorrecte, attendu 4-3=1: %+v", upd)
 	}
 	expectEvent(t, p1, "opponentScore")
 }
@@ -232,7 +240,7 @@ func TestRaceWinAtTwenty(t *testing.T) {
 	expectEvent(t, p1, "start")
 
 	answer := start.Question.Answer
-	for i := 0; i < winScore; i++ {
+	for i := 0; i < 20; i++ {
 		act(t, r, p0, map[string]int{"answer": answer})
 		var upd struct {
 			Question Question `json:"question"`
@@ -250,6 +258,63 @@ func TestRaceWinAtTwenty(t *testing.T) {
 	expectEvent(t, p1, "win")
 	if r.started {
 		t.Fatal("room encore démarrée après la victoire")
+	}
+}
+
+// TestHandleActionHTTPRoutesThroughGame vérifie que le handler HTTP réel
+// (pas seulement act(), qui reproduit son verrouillage) déclenche bien
+// room.Game.Action() sous room.mu : c'est la discipline de verrouillage
+// que ce refactor a pour but d'établir.
+func TestHandleActionHTTPRoutesThroughGame(t *testing.T) {
+	resetHub()
+	p0, _, _ := join("race", "addition", "Ludo")
+	expectEvent(t, p0, "waiting")
+	p1, _, _ := join("race", "addition", "Léa")
+
+	var start struct {
+		Question Question `json:"question"`
+	}
+	json.Unmarshal(expectEvent(t, p0, "start"), &start)
+	expectEvent(t, p1, "start")
+
+	body, _ := json.Marshal(map[string]int{"answer": start.Question.Answer})
+	req := httptest.NewRequest(http.MethodPost, "/api/action", strings.NewReader(string(body)))
+	req.Header.Set("X-Player-ID", p0.ID)
+	rec := httptest.NewRecorder()
+	handleActionHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, attendu 200 (body=%s)", rec.Code, rec.Body.String())
+	}
+
+	var upd struct {
+		YourScore int  `json:"yourScore"`
+		Correct   bool `json:"correct"`
+	}
+	json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
+	if !upd.Correct || upd.YourScore != 1 {
+		t.Fatalf("scoreUpdate via handleActionHTTP = %+v", upd)
+	}
+	expectEvent(t, p1, "opponentScore")
+}
+
+// TestHandleJoinHTTPRejectsInvalidRequests vérifie que le refus d'un jeu
+// inconnu ou d'une opération manquante/invalide (le comportement 400 que
+// ce refactor introduit délibérément) passe bien par le handler HTTP réel,
+// pas seulement par resolveKey().
+func TestHandleJoinHTTPRejectsInvalidRequests(t *testing.T) {
+	resetHub()
+	cases := []string{
+		`{"game":"connect4","name":"X"}`, // jeu inconnu (pas encore enregistré)
+		`{"game":"race","name":"X"}`,     // opération manquante
+	}
+	for _, body := range cases {
+		req := httptest.NewRequest(http.MethodPost, "/api/join", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		handleJoinHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("body=%s: status = %d, attendu 400", body, rec.Code)
+		}
 	}
 }
 
