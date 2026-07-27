@@ -1442,7 +1442,7 @@ async function connectSSE(name) {
         const res = await fetch('/api/join', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, operation: config.operation })
+            body: JSON.stringify({ game: 'race', name, operation: config.operation })
         });
 
         if (!res.ok) {
@@ -1616,7 +1616,7 @@ multiEl.multiAnswerForm.addEventListener('submit', (e) => {
     const answer = parseInt(multiEl.multiAnswerInput.value);
     if (isNaN(answer) || !multi.playerId) return;
 
-    fetch('/api/answer', {
+    fetch('/api/action', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
