@@ -825,9 +825,20 @@ body::after {
     text-align: center;
 }
 
-.waiting-rocket {
+.waiting-icon {
     font-size: 4rem;
-    animation: rocketFloat 2s ease-in-out infinite;
+    animation: waitingFloat 2s ease-in-out infinite;
+}
+
+/* Modifier réservé à la course de fusées : seule cette animation incline
+   l'émoji façon vol de fusée. Les autres jeux flottent sans rotation. */
+.waiting-icon.waiting-rocket {
+    animation-name: rocketFloat;
+}
+
+@keyframes waitingFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
 }
 
 @keyframes rocketFloat {

@@ -157,6 +157,14 @@
     min-height: 44px;
 }
 
+.c4-rematch-status {
+    min-height: 1.25rem;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
 /* ============================================================
    HOVER — pointeur fin uniquement (jamais sur tactile)
    ============================================================ */

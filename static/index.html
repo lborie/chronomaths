@@ -278,7 +278,7 @@
         <!-- Écran attente : partagé par les jeux en ligne -->
         <div id="screen-multi-waiting" class="screen">
             <div class="waiting-card">
-                <div class="waiting-rocket" id="waiting-emoji">🚀</div>
+                <div class="waiting-icon" id="waiting-emoji">🚀</div>
                 <h2>En attente d'un adversaire...</h2>
                 <p id="waiting-name" class="waiting-name"></p>
                 <p id="waiting-status" class="waiting-status">Connexion...</p>
@@ -470,6 +470,15 @@
                     <span class="multi-arrow">→</span>
                 </button>
 
+                <button id="btn-connect4-online" class="multi-btn c4-entry-btn">
+                    <span class="multi-icon">🌍</span>
+                    <span class="multi-text">
+                        <span class="multi-title">Puissance 4 en ligne</span>
+                        <span class="multi-details">2 joueurs, chacun son écran</span>
+                    </span>
+                    <span class="multi-arrow">→</span>
+                </button>
+
                 <button id="btn-games-back" class="back-btn" style="margin-top:1rem;">← Retour</button>
             </div>
         </div>
@@ -488,8 +497,9 @@
 
                 <div class="c4-actions">
                     <button id="btn-c4-replay" class="play-again-btn">
-                        <span>🔄</span> Nouvelle partie
+                        <span>🔄</span> <span id="c4-replay-label">Nouvelle partie</span>
                     </button>
+                    <p id="c4-rematch-status" class="c4-rematch-status" aria-live="polite"></p>
                     <button id="btn-c4-back" class="back-btn">← Retour</button>
                 </div>
             </div>

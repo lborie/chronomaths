@@ -1446,16 +1446,18 @@ const onlineEl = {
 
 const onlineFlow = {
     waitingEmoji: '🚀',
+    waitingTilt: false, // true seulement pour la course de fusées (inclinaison façon vol)
     back: 'modes',
     submit: null
 };
 
-function showJoinScreen({ emojiLeft, title, emojiRight, subtitle, waitingEmoji, back, onSubmit }) {
+function showJoinScreen({ emojiLeft, title, emojiRight, subtitle, waitingEmoji, waitingTilt, back, onSubmit }) {
     onlineEl.joinEmojiLeft.textContent = emojiLeft;
     onlineEl.joinTitle.textContent = title;
     onlineEl.joinEmojiRight.textContent = emojiRight;
     onlineEl.joinSubtitle.textContent = subtitle;
     onlineFlow.waitingEmoji = waitingEmoji;
+    onlineFlow.waitingTilt = !!waitingTilt;
     onlineFlow.back = back;
     onlineFlow.submit = onSubmit;
     showScreen('multiJoin');
@@ -1464,6 +1466,7 @@ function showJoinScreen({ emojiLeft, title, emojiRight, subtitle, waitingEmoji, 
 
 function showWaitingScreen(name) {
     onlineEl.waitingEmoji.textContent = onlineFlow.waitingEmoji;
+    onlineEl.waitingEmoji.classList.toggle('waiting-rocket', onlineFlow.waitingTilt);
     onlineEl.waitingName.textContent = name;
     onlineEl.waitingStatus.textContent = 'Connexion...';
     showScreen('multiWaiting');
@@ -1539,6 +1542,7 @@ multiEl.btnMulti.addEventListener('click', () => {
         emojiRight: '🚀',
         subtitle: 'Course de fusées !',
         waitingEmoji: '🚀',
+        waitingTilt: true,
         back: 'modes',
         onSubmit: joinRace
     });

@@ -75,7 +75,20 @@ screens.connect4 = document.getElementById('screen-connect4');
 const c4El = {
     board: document.getElementById('c4-board'),
     turn: document.getElementById('c4-turn'),
-    score: document.getElementById('c4-score')
+    score: document.getElementById('c4-score'),
+    replay: document.getElementById('btn-c4-replay'),
+    replayLabel: document.getElementById('c4-replay-label'),
+    rematchStatus: document.getElementById('c4-rematch-status')
+};
+
+// État du mode en ligne. Le plateau fait autorité côté serveur : on ne garde
+// ici que l'identité des joueurs et le dernier snapshot reçu.
+const c4Online = {
+    color: 0,            // 1 = rouge, 2 = jaune
+    myName: '',
+    opponentName: '',
+    state: null,
+    lost: ''             // message de fin anormale, '' si tout va bien
 };
 
 function cancelC4Drop() {
@@ -109,6 +122,18 @@ document.getElementById('btn-connect4').addEventListener('click', () => {
     showScreen('connect4');
 });
 
+document.getElementById('btn-connect4-online').addEventListener('click', () => {
+    showJoinScreen({
+        emojiLeft: '🌍',
+        title: 'Puissance 4 en ligne',
+        emojiRight: '🔴',
+        subtitle: 'Trouve un adversaire !',
+        waitingEmoji: '🔴',
+        back: 'games',
+        onSubmit: joinConnect4Online
+    });
+});
+
 document.getElementById('btn-c4-back').addEventListener('click', () => {
     cancelC4Drop();
     sessionClose();
@@ -117,6 +142,10 @@ document.getElementById('btn-c4-back').addEventListener('click', () => {
 });
 
 document.getElementById('btn-c4-replay').addEventListener('click', () => {
+    if (c4.mode === 'online') {
+        sessionSend({ type: 'rematch' });
+        return;
+    }
     c4.starter = c4.starter === 1 ? 2 : 1;
     startC4Round();
 });
@@ -143,6 +172,10 @@ function startC4Round() {
     });
     updateC4Turn();
     updateC4Score();
+    c4El.replay.style.display = '';
+    c4El.replay.disabled = false;
+    c4El.replayLabel.textContent = 'Nouvelle partie';
+    c4El.rematchStatus.textContent = '';
 }
 
 // ============================================================
@@ -309,4 +342,152 @@ function playC4LocalMove(col) {
 function showC4End(text) {
     c4El.turn.textContent = text;
     c4El.turn.className = 'c4-turn c4-turn-over';
+}
+
+// ============================================================
+// PUISSANCE 4 EN LIGNE
+// Le serveur fait autorité : chaque event porte un snapshot complet
+// du plateau, le client n'appelle jamais dropDisc.
+// ============================================================
+
+function joinConnect4Online(name) {
+    c4.mode = 'online';
+    c4Online.color = 0;
+    c4Online.myName = name;
+    c4Online.opponentName = '';
+    c4Online.state = null;
+    c4Online.lost = '';
+
+    showWaitingScreen(name);
+
+    sessionJoin({
+        game: 'connect4',
+        name,
+        on: {
+            waiting: () => {
+                setWaitingStatus('');
+            },
+            start: (msg) => {
+                c4Online.color = msg.color;
+                c4Online.opponentName = msg.opponent;
+                showScreen('connect4');
+                applyC4State(msg.state, false);
+            },
+            c4State: (msg) => applyC4State(msg.state, true),
+            opponentLeft: () => showC4Lost('🚪 Adversaire déconnecté')
+        },
+        onLost: () => showC4Lost('⚠️ Connexion perdue'),
+        onError: () => setWaitingStatus('Erreur de connexion')
+    });
+}
+
+// Applique un snapshot serveur. animate est faux pour l'état initial d'une
+// manche (aucun jeton à faire tomber).
+function applyC4State(state, animate) {
+    // Garde bornée : un snapshot mal formé (réseau) ne doit pas planter le
+    // rendu, qui indexe board[row][col] sans vérification de forme.
+    if (!state || !Array.isArray(state.board) || state.board.length !== C4_ROWS) {
+        console.error('applyC4State: snapshot invalide, ignoré', state);
+        return;
+    }
+
+    c4Online.state = state;
+
+    const myTurn = !state.over && !c4Online.lost && state.current === c4Online.color;
+    const opts = {
+        lastMove: state.lastMove,
+        line: state.line,
+        playable: myTurn,
+        hint: state.over || c4Online.lost ? 0 : state.current
+    };
+
+    if (animate && state.lastMove) {
+        renderC4Move(state.board, opts, () => updateC4Online(state));
+    } else {
+        // Un nouveau snapshot rend obsolète toute chute encore en attente :
+        // son onSettled ne sera jamais rappelé, cancelC4Drop() l'abandonne
+        // volontairement (cf. finding 3 du brief).
+        cancelC4Drop();
+        renderC4Snapshot(state.board, { ...opts, lastMove: null });
+        updateC4Online(state);
+    }
+}
+
+function updateC4Online(state) {
+    updateC4OnlineTurn(state);
+    updateC4OnlineScore(state);
+    updateC4OnlineRematch(state);
+}
+
+function updateC4OnlineTurn(state) {
+    if (c4Online.lost) {
+        c4El.turn.textContent = c4Online.lost;
+        c4El.turn.className = 'c4-turn c4-turn-over';
+        return;
+    }
+
+    if (state.over) {
+        if (state.result === 'draw') {
+            c4El.turn.textContent = '🤝 Match nul !';
+        } else if (state.winner === c4Online.color) {
+            c4El.turn.textContent = '🏆 Tu gagnes !';
+        } else {
+            c4El.turn.textContent = `😢 ${c4Online.opponentName} gagne !`;
+        }
+        c4El.turn.className = 'c4-turn c4-turn-over';
+        return;
+    }
+
+    const color = state.current;
+    const emoji = C4_PLAYERS[color].emoji;
+    c4El.turn.textContent = color === c4Online.color
+        ? `${emoji} À toi de jouer`
+        : `${emoji} Au tour de ${c4Online.opponentName}`;
+    c4El.turn.className = `c4-turn c4-turn-p${color}`;
+}
+
+// Rouge (index 0) reste toujours à gauche, quel que soit le joueur devant
+// l'écran : les deux clients affichent le même score dans le même ordre.
+function updateC4OnlineScore(state) {
+    const redName = c4Online.color === 1 ? c4Online.myName : c4Online.opponentName;
+    const yellowName = c4Online.color === 2 ? c4Online.myName : c4Online.opponentName;
+    c4El.score.textContent = `🔴 ${redName} ${state.wins[0]} – ${state.wins[1]} ${yellowName} 🟡`;
+}
+
+function updateC4OnlineRematch(state) {
+    c4El.replayLabel.textContent = 'Nouvelle manche';
+
+    if (c4Online.lost) {
+        c4El.replay.style.display = 'none';
+        c4El.rematchStatus.textContent = '';
+        return;
+    }
+
+    c4El.replay.style.display = state.over ? '' : 'none';
+
+    const meAsked = state.rematch[c4Online.color - 1];
+    const themAsked = state.rematch[2 - c4Online.color];
+    c4El.replay.disabled = meAsked;
+
+    if (meAsked && !themAsked) {
+        c4El.rematchStatus.textContent = `⏳ En attente de ${c4Online.opponentName}…`;
+    } else if (themAsked && !meAsked) {
+        c4El.rematchStatus.textContent = `🔄 ${c4Online.opponentName} veut rejouer`;
+    } else {
+        c4El.rematchStatus.textContent = '';
+    }
+}
+
+// Fin anormale : adversaire parti ou flux perdu. Le plateau reste affiché,
+// verrouillé, avec pour seule issue le bouton Retour.
+function showC4Lost(message) {
+    sessionClose();
+
+    if (getActiveScreen() !== 'connect4' || !c4Online.state) {
+        setWaitingStatus('Connexion perdue');
+        return;
+    }
+
+    c4Online.lost = message;
+    applyC4State(c4Online.state, false);
 }
