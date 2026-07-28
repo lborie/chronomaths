@@ -155,18 +155,33 @@ function c4DropMs() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : C4_DROP_MS;
 }
 
+// Colonne à reconcentrer après un rendu, en dehors de la fonction : un coup
+// enchaîne deux rendus (renderC4Move verrouille la chute, puis révèle l'issue
+// une fois l'animation terminée) et le premier désactive toutes les colonnes,
+// donc la case ciblée n'y est jamais focusable — capturer localement à chaque
+// appel perdrait la colonne avant le second rendu, qui la restituerait. En la
+// gardant au niveau du module, elle survit à la reconstruction intermédiaire.
+let c4FocusCol = null;
+
 // Rendu du plateau depuis son état complet, partagé par les deux modes.
 //   lastMove : {row, col} du dernier jeton posé (animé), ou null
 //   line     : cellules gagnantes à mettre en valeur, ou null
 //   playable : colonnes cliquables
 //   hint     : couleur de l'indice de survol (1 ou 2), 0 pour aucun
 function renderC4Snapshot(board, { lastMove, line, playable, hint }) {
-    // La grille est reconstruite entièrement : mémoriser la colonne au clavier
-    // pour la rendre, sinon chaque coup éjecterait le focus vers <body>.
+    // La grille est reconstruite entièrement, ce qui éjecte le focus vers
+    // <body>. Mémoriser la colonne au clavier pour la restituer plus bas :
+    // - si le focus est sur une colonne, on retient sa position ;
+    // - si le focus est déjà sur <body>, c'est notre propre reconstruction
+    //   précédente qui vient de l'y envoyer : on garde la colonne mémorisée ;
+    // - sinon, le focus a été déplacé délibérément ailleurs (ex. bouton
+    //   « Nouvelle partie ») : on ne le ramène pas de force dans la grille.
     const focused = document.activeElement;
-    const focusCol = focused && focused.classList.contains('c4-col')
-        ? focused.dataset.col
-        : null;
+    if (focused && focused.classList.contains('c4-col')) {
+        c4FocusCol = focused.dataset.col;
+    } else if (focused !== document.body) {
+        c4FocusCol = null;
+    }
 
     c4El.board.textContent = '';
     c4El.board.className = hint ? `c4-board c4-hint-p${hint}` : 'c4-board';
@@ -204,8 +219,8 @@ function renderC4Snapshot(board, { lastMove, line, playable, hint }) {
         c4El.board.appendChild(colEl);
     }
 
-    if (focusCol !== null) {
-        const target = c4El.board.querySelector(`.c4-col[data-col="${focusCol}"]:not(:disabled)`);
+    if (c4FocusCol !== null) {
+        const target = c4El.board.querySelector(`.c4-col[data-col="${c4FocusCol}"]:not(:disabled)`);
         if (target) target.focus();
     }
 }
