@@ -271,6 +271,11 @@ function renderC4Snapshot(board, { lastMove, line, playable, hint }) {
 // tout second coup sans drapeau supplémentaire.
 function renderC4Move(board, opts, onSettled) {
     renderC4Snapshot(board, { ...opts, line: null, playable: false });
+    // Deux snapshots serveur peuvent s'enchaîner avant l'échéance : le
+    // second appel annule le premier, dont l'onSettled ne sera jamais
+    // rappelé. C'est volontaire — un snapshot plus récent rend obsolète la
+    // mise à jour que portait l'appel abandonné, l'état qui arrive fait
+    // autorité.
     cancelC4Drop();
     c4.dropTimer = setTimeout(() => {
         c4.dropTimer = null;
@@ -391,6 +396,17 @@ function applyC4State(state, animate) {
         return;
     }
 
+    // Une case ne peut jamais être rejouée : deux coups réels ont donc
+    // toujours des coordonnées distinctes. Une demande de revanche (accord
+    // d'un seul joueur) rediffuse en revanche exactement le même lastMove
+    // que la manche déjà terminée, sans qu'aucun jeton n'ait bougé — on ne
+    // rejoue l'animation que si ces coordonnées ont changé depuis le
+    // dernier snapshot rendu, capturé ici avant d'être écrasé.
+    const prevMove = c4Online.state && c4Online.state.lastMove;
+    const isNewMove = !!(state.lastMove && (
+        !prevMove || prevMove.row !== state.lastMove.row || prevMove.col !== state.lastMove.col
+    ));
+
     c4Online.state = state;
 
     const myTurn = !state.over && !c4Online.lost && state.current === c4Online.color;
@@ -401,12 +417,12 @@ function applyC4State(state, animate) {
         hint: state.over || c4Online.lost ? 0 : state.current
     };
 
-    if (animate && state.lastMove) {
+    if (animate && isNewMove) {
         renderC4Move(state.board, opts, () => updateC4Online(state));
     } else {
-        // Un nouveau snapshot rend obsolète toute chute encore en attente :
-        // son onSettled ne sera jamais rappelé, cancelC4Drop() l'abandonne
-        // volontairement (cf. finding 3 du brief).
+        // Rendu immédiat : cancelC4Drop() coupe une chute encore en cours si
+        // ce snapshot ne correspond à aucun nouveau coup (état initial,
+        // revanche demandée/acceptée, fin anormale de partie).
         cancelC4Drop();
         renderC4Snapshot(state.board, { ...opts, lastMove: null });
         updateC4Online(state);
