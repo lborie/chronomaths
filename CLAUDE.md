@@ -32,8 +32,8 @@ chronomaths/
     ├── games.css     # Styles du hub Jeux et du plateau Puissance 4
     ├── app.js        # Machine à états, génération questions (+, −, ×, ÷), timer
     ├── games.js      # Section Jeux : logique pure + rendu du Puissance 4
-    ├── battleship.js  # Bataille navale en ligne : rendu par snapshot
-    ├── battleship.css # Styles des grilles de la bataille navale
+    ├── battleship.js # Bataille navale en ligne : rendu par snapshot
+    ├── battleship.css# Styles des grilles de la bataille navale
     ├── manifest.json # Web App Manifest (PWA)
     ├── sw.js         # Service Worker (cache offline)
     └── icon.svg      # Icône PWA
@@ -66,7 +66,8 @@ go run .
 ```
 Accueil ──┬─ (+, −, × ou ÷) → Modes (Sprint/Course/Marathon/Posée/Révision/Multi) → Jeu
           └─ 🎮 Jeux → Hub Jeux ──┬─ Puissance 4 (local)
-                                  └─ Puissance 4 en ligne → rejoindre → attente → plateau
+                                  ├─ Puissance 4 en ligne → rejoindre → attente → plateau
+                                  └─ Bataille navale en ligne → rejoindre → attente → plateau
 ```
 
 ### Opération configurable
@@ -80,14 +81,14 @@ Accueil ──┬─ (+, −, × ou ÷) → Modes (Sprint/Course/Marathon/Posée
 
 - **Server→Client** : Server-Sent Events via `GET /api/events?playerId=XXX` (`EventSource`)
 - **Client→Server** : `POST /api/join` (rejoindre) et `POST /api/action` (jouer, header `X-Player-ID`)
-- `session.go` ne connaît aucune règle de jeu : il délègue à l'interface `Game` (`Start`, `Action`), implémentée par `raceGame` (`race.go`) et `connect4Game` (`connect4.go`). Chaque jeu s'enregistre dans `gameKinds` via son `init()`.
-- Files d'attente isolées par clé : `race:<operation>` ou `connect4`. Un jeu ou une variante inconnus sont **refusés en 400** — sans ce contrôle, une demande mal formée serait appariée dans la file d'un autre jeu.
+- `session.go` ne connaît aucune règle de jeu : il délègue à l'interface `Game` (`Start`, `Action`), implémentée par `raceGame` (`race.go`), `connect4Game` (`connect4.go`) et `battleshipGame` (`battleship.go`). Chaque jeu s'enregistre dans `gameKinds` via son `init()`.
+- Files d'attente isolées par clé : `race:<operation>`, `connect4` ou `battleship`. Un jeu ou une variante inconnus sont **refusés en 400** — sans ce contrôle, une demande mal formée serait appariée dans la file d'un autre jeu.
 - Un jeu à plusieurs files implémente `VariantGame.Variant()` (la course en a une par opération) ; le Puissance 4 ne l'implémente pas.
 - **Discipline de verrous** : le matchmaking résout la room sous `globalMu`, relâche `globalMu`, puis appelle le jeu ; les callbacks `Game` s'exécutent sous `room.mu` seul.
 - ⚠️ `sendEvent` abandonne un message quand le canal du joueur est plein. Tout jeu tour par tour doit donc diffuser un **snapshot complet** de son état, jamais un delta : un delta perdu désynchronise définitivement, un état absolu est auto-réparant.
 - ⚠️ `Question.Answer` (race.go) porte `json:"-"` : la question part au client **avant** qu'il ne réponde (events `start` et `scoreUpdate`), un joueur lisant son propre flux SSE gagnerait sinon à coup sûr. Le serveur garde la réponse pour valider et ne la révèle qu'après coup via `scoreUpdate.correctAnswer`. Corollaire pour les tests : la réponse attendue se lit dans l'état serveur (`raceAnswer()` → `p.State.(*raceState)`), jamais dans le flux.
 - Chaque joueur reçoit un `playerId` unique (16 hex, `crypto/rand`) au join. Keepalive SSE toutes les 30 s, timeout joueur fantôme 30 s.
-- Events génériques : `waiting`, `opponentLeft`. Course : `start`, `scoreUpdate`, `opponentScore`, `win`. Puissance 4 : `start`, `c4State`.
+- Events génériques : `waiting`, `opponentLeft`. Course : `start`, `scoreUpdate`, `opponentScore`, `win`. Puissance 4 : `start`, `c4State`. Bataille navale : `start`, `bsState`.
 - ⚠️ `session.epoch` (app.js) périme un join encore en vol. `sessionJoin` attend la réponse de `POST /api/join` ; pendant cette attente l'utilisateur peut annuler (« ← Annuler ») ou relancer un join. Sans ce compteur — capturé après le `sessionClose()` d'entrée, revérifié après le `await` — la réponse tardive réinstallait un `playerId` et un flux SSE que plus aucun écran ne pilotait : le joueur restait dans la file du serveur et se retrouvait **projeté sur le plateau** depuis le hub Jeux dès qu'un adversaire rejoignait. Le joueur resté côté serveur n'a jamais ouvert son SSE : `watchGhost` le récupère au bout de 30 s, et son adversaire reçoit `opponentLeft`. Tout nouvel `await` dans `sessionJoin` doit revérifier l'époque.
 - **Front** : `sessionJoin({game, operation, name, on, onLost, onError})`, `sessionSend(payload)` et `sessionClose()` vivent dans `app.js` (pas de fichier séparé : cela imposerait une entrée de plus dans le precache de `sw.js` et une contrainte d'ordre de chargement supplémentaire). `on` est une table `nom d'event → handler`.
 - Les écrans `screen-multi-join` et `screen-multi-waiting` sont **partagés** par les jeux en ligne : `showJoinScreen({emojiLeft, title, emojiRight, subtitle, waitingEmoji, waitingTilt, back, onSubmit})` en fournit l'habillage et la destination de retour.
@@ -117,8 +118,8 @@ Accueil ──┬─ (+, −, × ou ÷) → Modes (Sprint/Course/Marathon/Posée
 - Le placement est **aléatoire côté serveur** : le serveur n'accepte jamais une flotte venue du client, ce qui supprime toute validation de placement triché.
 - Les cases non jouables sont `disabled` : le verrou est porté par le DOM, sans drapeau de lock. Une case déjà tirée l'est aussi.
 - `bsFocusCell` est en portée module, pour la même raison que `c4FocusCol` : la grille est entièrement reconstruite à chaque rendu.
-- Un snapshot n'est animé que si les coordonnées de `lastShot` ont changé depuis le précédent rendu. Ni le nom de l'event (la revanche rediffuse le même `lastShot`) ni `Round` (il s'incrémente sur le snapshot qui ne doit pas s'animer) ne sont des discriminants valides.
-- **Cases de ~37 px sur téléphone.** Les 44 px sont hors d'atteinte pour 8 colonnes : 352 px de cases + 21 de gaps + 24 de paddings = 397 px utiles, soit un écran de 429 px. La réponse retenue est **« viser puis confirmer »** — un tap sélectionne, le bouton « 🎯 Feu ! » de 44 px tire — et non un rétrécissement de la grille. À réévaluer si le geste s'avère pénible à l'usage.
+- Un snapshot n'est animé que si les coordonnées de `lastShot`, **ou son autrice (`by`)**, ont changé depuis le précédent rendu — deux tirs peuvent viser les mêmes coordonnées sur deux grilles différentes (la mienne et celle de l'adversaire), `by` est le seul champ qui les distingue. Ni le nom de l'event (la revanche rediffuse le même `lastShot`) ni `Round` (il s'incrémente sur le snapshot qui ne doit pas s'animer) ne sont des discriminants valides.
+- **Cases de ~28 à 37 px sur téléphone selon la largeur** (mesuré : 28,0 px à 320 px, 34,9 px à 375 px, 36,8 px à 390 px, 46,5 px en paysage 740×360). Les 44 px ne sont pas atteignables sur téléphone pour 8 colonnes, et c'est assumé. La réponse retenue est **« viser puis confirmer »** — un tap sélectionne, le bouton « 🎯 Feu ! » de 44 px tire — et non un rétrécissement de la grille. Ne pas descendre le `gap` sous 3 px pour gratter ces derniers pixels. À réévaluer si le geste s'avère pénible à l'usage.
 - `bsStateMsg` reflète `bsRoom` à la main : tout nouveau champ doit y être reporté, et un champ ajouté à la légère peut révéler la flotte adverse.
 - ⚠️ `#bs-rematch-status` porte **deux usages** : le statut d'attente de revanche/placement et l'annonce du bateau coulé. Le message d'attente est **prioritaire** sur l'annonce — `bsUpdateRematch` écrit toujours ce champ en premier (message d'attente ou chaîne vide), et `bsAnnounceSunk` ne pose son annonce que si le créneau est resté vide. C'est aussi ce qui efface l'annonce au tir suivant : `bsUpdateRematch` aura déjà réinitialisé le champ avant le nouvel appel.
 - L'annonce « je coule un bateau adverse » se détermine en **comparant `enemy.sunkShips` au snapshot précédent** pour trouver le nom nouvellement apparu — jamais en prenant le dernier élément du tableau, qui suit l'ordre de `bsFleetSpec` et non l'ordre chronologique des coulages. C'est le seul endroit du jeu qui dépende d'un **delta** entre deux snapshots, alors que la règle du dépôt est « état absolu, jamais un delta » : une perte de message peut donc avaler une annonce, jamais en produire une fausse. Le sens inverse, « mon bateau coule », s'apparie par coordonnées avec `lastShot` et échappe à cette limite.
