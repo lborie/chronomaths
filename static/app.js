@@ -299,15 +299,6 @@ function cleanupScreen(screenName) {
         case 'game':
             clearInterval(state.timerInterval);
             break;
-        case 'multiWaiting':
-        case 'multiRace':
-        case 'multiWin':
-            if (multi.eventSource) {
-                multi.eventSource.close();
-                multi.eventSource = null;
-            }
-            multi.playerId = null;
-            break;
     }
 }
 
@@ -1354,14 +1345,183 @@ poseeEl.btnReplay.addEventListener('click', () => {
 });
 
 // ============================================================
+// SESSION EN LIGNE (générique : course de fusées, Puissance 4)
+// ============================================================
+
+const session = {
+    eventSource: null,
+    playerId: null,
+    name: '',
+    // Identifie la tentative de connexion en cours. sessionJoin() attend la
+    // réponse de POST /api/join, et pendant cette attente l'utilisateur peut
+    // annuler (« ← Annuler ») ou relancer un join. Sans ce compteur, la
+    // réponse tardive réinstallait un playerId et un flux SSE que plus aucun
+    // écran ne pilotait : le joueur restait dans la file du serveur, puis se
+    // retrouvait projeté sur le plateau alors qu'il était revenu au hub.
+    epoch: 0
+};
+
+// Ouvre une session : POST /api/join puis branchement du flux SSE.
+//   on      : table { nom d'event SSE -> handler(data) }
+//   onLost  : appelé si le flux se ferme de façon inattendue
+//   onError : appelé si le join échoue
+// Retourne true si la session est ouverte.
+async function sessionJoin({ game, operation, name, on, onLost, onError }) {
+    sessionClose();
+    session.name = name;
+    // Capturé après sessionClose(), qui incrémente le compteur : toute
+    // annulation ou relance ultérieure rendra cette valeur périmée.
+    const epoch = session.epoch;
+
+    let playerId;
+    try {
+        const res = await fetch('/api/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ game, name, operation })
+        });
+        if (!res.ok) {
+            if (session.epoch === epoch && onError) onError();
+            return false;
+        }
+        playerId = (await res.json()).playerId;
+    } catch (err) {
+        if (session.epoch === epoch && onError) onError();
+        return false;
+    }
+
+    // Session annulée ou remplacée pendant l'aller-retour : on n'ouvre pas de
+    // flux et on ne touche pas à l'état, sinon on ressuscite une session que
+    // l'utilisateur a quittée. Le joueur resté côté serveur n'a jamais ouvert
+    // son SSE : watchGhost le récupère au bout de 30 s.
+    if (session.epoch !== epoch) return false;
+
+    session.playerId = playerId;
+
+    const es = new EventSource(`/api/events?playerId=${encodeURIComponent(playerId)}`);
+    session.eventSource = es;
+
+    Object.entries(on).forEach(([event, handler]) => {
+        es.addEventListener(event, (e) => handler(e.data ? JSON.parse(e.data) : {}));
+    });
+
+    es.onerror = () => {
+        if (es.readyState === EventSource.CLOSED) {
+            session.eventSource = null;
+            session.playerId = null;
+            if (onLost) onLost();
+        }
+    };
+
+    return true;
+}
+
+// Envoie un coup au serveur. Le format est propre à chaque jeu.
+function sessionSend(payload) {
+    if (!session.playerId) return;
+    fetch('/api/action', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Player-ID': session.playerId
+        },
+        body: JSON.stringify(payload)
+    });
+}
+
+// Ferme la session. Sans effet si aucune session n'est ouverte — sauf sur
+// l'époque, toujours incrémentée : c'est ce qui périme un join encore en vol.
+function sessionClose() {
+    session.epoch++;
+    if (session.eventSource) {
+        session.eventSource.close();
+        session.eventSource = null;
+    }
+    session.playerId = null;
+}
+
+// Les écrans en ligne ferment la session quand on les quitte (y compris via
+// la navigation arrière du navigateur).
+screenCleanups.multiWaiting = sessionClose;
+screenCleanups.multiRace = sessionClose;
+screenCleanups.multiWin = sessionClose;
+
+// ------------------------------------------------------------
+// Écrans « rejoindre » et « attente », partagés par les jeux en ligne.
+// Chaque jeu fournit son habillage et sa destination de retour.
+// ------------------------------------------------------------
+
+const onlineEl = {
+    joinEmojiLeft: document.getElementById('join-emoji-left'),
+    joinTitle: document.getElementById('join-title'),
+    joinEmojiRight: document.getElementById('join-emoji-right'),
+    joinSubtitle: document.getElementById('join-subtitle'),
+    waitingEmoji: document.getElementById('waiting-emoji'),
+    waitingName: document.getElementById('waiting-name'),
+    waitingStatus: document.getElementById('waiting-status'),
+    btnWaitingCancel: document.getElementById('btn-waiting-cancel')
+};
+
+const onlineFlow = {
+    waitingEmoji: '🚀',
+    waitingTilt: false, // true seulement pour la course de fusées (inclinaison façon vol)
+    back: 'modes',
+    submit: null
+};
+
+function showJoinScreen({ emojiLeft, title, emojiRight, subtitle, waitingEmoji, waitingTilt, back, onSubmit }) {
+    onlineEl.joinEmojiLeft.textContent = emojiLeft;
+    onlineEl.joinTitle.textContent = title;
+    onlineEl.joinEmojiRight.textContent = emojiRight;
+    onlineEl.joinSubtitle.textContent = subtitle;
+    onlineFlow.waitingEmoji = waitingEmoji;
+    onlineFlow.waitingTilt = !!waitingTilt;
+    onlineFlow.back = back;
+    onlineFlow.submit = onSubmit;
+    showScreen('multiJoin');
+    document.getElementById('player-name').focus();
+}
+
+function showWaitingScreen(name) {
+    onlineEl.waitingEmoji.textContent = onlineFlow.waitingEmoji;
+    onlineEl.waitingEmoji.classList.toggle('waiting-rocket', onlineFlow.waitingTilt);
+    onlineEl.waitingName.textContent = name;
+    onlineEl.waitingStatus.textContent = 'Connexion...';
+    showScreen('multiWaiting');
+}
+
+function setWaitingStatus(text) {
+    onlineEl.waitingStatus.textContent = text;
+}
+
+// Quitte le parcours en ligne courant : ferme la session et revient à l'écran
+// d'où le jeu a été lancé (Modes pour la course, hub Jeux pour le Puissance 4).
+function leaveOnline() {
+    sessionClose();
+    showScreen(onlineFlow.back);
+}
+
+function submitOnlineName() {
+    const input = document.getElementById('player-name');
+    const name = input.value.trim();
+    if (!name || !onlineFlow.submit) return;
+    onlineFlow.submit(name);
+}
+
+document.getElementById('btn-join').addEventListener('click', submitOnlineName);
+document.getElementById('player-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitOnlineName();
+});
+document.getElementById('btn-back-home').addEventListener('click', leaveOnline);
+onlineEl.btnWaitingCancel.addEventListener('click', leaveOnline);
+
+// ============================================================
 // MULTIPLAYER MODE
 // ============================================================
 
 const WIN_SCORE = 20;
 
 const multi = {
-    eventSource: null,
-    playerId: null,
     playerName: '',
     opponentName: '',
     myScore: 0,
@@ -1370,10 +1530,7 @@ const multi = {
 
 const multiEl = {
     btnMulti: document.getElementById('btn-multi'),
-    btnBackHome: document.getElementById('btn-back-home'),
     joinForm: document.getElementById('join-form'),
-    playerName: document.getElementById('player-name'),
-    waitingName: document.getElementById('waiting-name'),
     player1Name: document.getElementById('player1-name'),
     player2Name: document.getElementById('player2-name'),
     player1Score: document.getElementById('player1-score'),
@@ -1397,114 +1554,58 @@ const multiEl = {
 };
 
 multiEl.btnMulti.addEventListener('click', () => {
-    showScreen('multiJoin');
-    multiEl.playerName.focus();
+    showJoinScreen({
+        emojiLeft: '🎮',
+        title: 'Multi Joueur',
+        emojiRight: '🚀',
+        subtitle: 'Course de fusées !',
+        waitingEmoji: '🚀',
+        waitingTilt: true,
+        back: 'modes',
+        onSubmit: joinRace
+    });
 });
 
-multiEl.btnBackHome.addEventListener('click', () => {
-    if (multi.eventSource) {
-        multi.eventSource.close();
-        multi.eventSource = null;
-    }
-    multi.playerId = null;
-    showScreen('modes');
-});
-
-function joinGame() {
-    const name = multiEl.playerName.value.trim();
-    if (!name) return;
-
+function joinRace(name) {
     multi.playerName = name;
     multi.myScore = 0;
     multi.opponentScore = 0;
 
-    connectSSE(name);
-}
+    showWaitingScreen(name);
 
-document.getElementById('btn-join').addEventListener('click', joinGame);
-multiEl.playerName.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') joinGame();
-});
-
-const waitingStatusEl = document.getElementById('waiting-status');
-
-async function connectSSE(name) {
-    if (multi.eventSource) {
-        multi.eventSource.close();
-        multi.eventSource = null;
-    }
-
-    multiEl.waitingName.textContent = name;
-    waitingStatusEl.textContent = 'Connexion...';
-    showScreen('multiWaiting');
-
-    try {
-        const res = await fetch('/api/join', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, operation: config.operation })
-        });
-
-        if (!res.ok) {
-            waitingStatusEl.textContent = 'Erreur de connexion';
-            return;
-        }
-
-        const { playerId } = await res.json();
-        multi.playerId = playerId;
-
-        const es = new EventSource(`/api/events?playerId=${playerId}`);
-        multi.eventSource = es;
-
-        es.addEventListener('waiting', (e) => {
-            multiEl.waitingName.textContent = multi.playerName;
-            waitingStatusEl.textContent = '';
-            showScreen('multiWaiting');
-        });
-
-        es.addEventListener('start', (e) => {
-            const msg = JSON.parse(e.data);
-            multi.opponentName = msg.opponent;
-            multi.myScore = 0;
-            multi.opponentScore = 0;
-            startMultiRace(msg);
-        });
-
-        es.addEventListener('scoreUpdate', (e) => {
-            const msg = JSON.parse(e.data);
-            multi.myScore = msg.yourScore;
-            multi.opponentScore = msg.opponentScore;
-            handleScoreUpdate(msg);
-        });
-
-        es.addEventListener('opponentScore', (e) => {
-            const msg = JSON.parse(e.data);
-            multi.opponentScore = msg.opponentScore;
-            updateRaceTrack();
-        });
-
-        es.addEventListener('win', (e) => {
-            const msg = JSON.parse(e.data);
-            showWinScreen(msg.winner);
-        });
-
-        es.addEventListener('opponentLeft', () => {
-            showOpponentLeft();
-        });
-
-        es.onerror = () => {
-            if (es.readyState === EventSource.CLOSED) {
-                multi.eventSource = null;
-                multi.playerId = null;
-                const screen = getActiveScreen();
-                if (screen === 'multiRace') {
-                    showOpponentLeft();
-                }
-            }
-        };
-    } catch (err) {
-        waitingStatusEl.textContent = 'Erreur de connexion';
-    }
+    sessionJoin({
+        game: 'race',
+        operation: config.operation,
+        name,
+        on: {
+            waiting: () => {
+                onlineEl.waitingName.textContent = multi.playerName;
+                setWaitingStatus('');
+                showScreen('multiWaiting');
+            },
+            start: (msg) => {
+                multi.opponentName = msg.opponent;
+                multi.myScore = 0;
+                multi.opponentScore = 0;
+                startMultiRace(msg);
+            },
+            scoreUpdate: (msg) => {
+                multi.myScore = msg.yourScore;
+                multi.opponentScore = msg.opponentScore;
+                handleScoreUpdate(msg);
+            },
+            opponentScore: (msg) => {
+                multi.opponentScore = msg.opponentScore;
+                updateRaceTrack();
+            },
+            win: (msg) => showWinScreen(msg.winner),
+            opponentLeft: () => showOpponentLeft()
+        },
+        onLost: () => {
+            if (getActiveScreen() === 'multiRace') showOpponentLeft();
+        },
+        onError: () => setWaitingStatus('Erreur de connexion')
+    });
 }
 
 function startMultiRace(msg) {
@@ -1614,23 +1715,11 @@ function showOpponentLeft() {
 multiEl.multiAnswerForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const answer = parseInt(multiEl.multiAnswerInput.value);
-    if (isNaN(answer) || !multi.playerId) return;
-
-    fetch('/api/answer', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Player-ID': multi.playerId
-        },
-        body: JSON.stringify({ answer })
-    });
+    if (isNaN(answer)) return;
+    sessionSend({ answer });
 });
 
 multiEl.btnPlayAgainMulti.addEventListener('click', () => {
-    if (multi.eventSource) {
-        multi.eventSource.close();
-        multi.eventSource = null;
-    }
-    multi.playerId = null;
+    sessionClose();
     showScreen('modes');
 });

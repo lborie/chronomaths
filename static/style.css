@@ -806,11 +806,8 @@ body::after {
     font-size: 1rem;
     cursor: pointer;
     padding: 0.5rem;
+    min-height: 44px;
     transition: color 0.2s;
-}
-
-.back-btn:hover {
-    color: var(--text);
 }
 
 /* Waiting screen */
@@ -825,9 +822,20 @@ body::after {
     text-align: center;
 }
 
-.waiting-rocket {
+.waiting-icon {
     font-size: 4rem;
-    animation: rocketFloat 2s ease-in-out infinite;
+    animation: waitingFloat 2s ease-in-out infinite;
+}
+
+/* Modifier réservé à la course de fusées : seule cette animation incline
+   l'émoji façon vol de fusée. Les autres jeux flottent sans rotation. */
+.waiting-icon.waiting-rocket {
+    animation-name: rocketFloat;
+}
+
+@keyframes waitingFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
 }
 
 @keyframes rocketFloat {
@@ -876,6 +884,10 @@ body::after {
 .waiting-dots span:nth-child(3) {
     animation-delay: 0.4s;
     background: var(--accent);
+}
+
+.waiting-card .back-btn {
+    margin-top: 1.25rem;
 }
 
 @keyframes dotPulse {
@@ -1342,10 +1354,6 @@ body::after {
     background: linear-gradient(135deg, var(--success), #1abc9c);
 }
 
-.posee-next-btn:hover {
-    box-shadow: 0 8px 20px rgba(46, 213, 115, 0.35);
-}
-
 .posee-stop-btn {
     display: block;
     width: 100%;
@@ -1807,6 +1815,17 @@ body::after {
     .submit-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(255, 107, 107, 0.35);
+    }
+
+    /* Même spécificité que .submit-btn:hover ; placée après pour que son
+       box-shadow (vert) l'emporte sur le bouton « Suivant », qui porte
+       les deux classes. */
+    .posee-next-btn:hover {
+        box-shadow: 0 8px 20px rgba(46, 213, 115, 0.35);
+    }
+
+    .back-btn:hover {
+        color: var(--text);
     }
 
     .join-btn:hover {
