@@ -89,6 +89,7 @@ function cancelC4Drop() {
 screenCleanups.connect4 = () => {
     cancelC4Drop();
     sessionClose();
+    c4FocusCol = null; // évite qu'une colonne mémorisée survive à une manche neuve
 };
 
 // ============================================================
@@ -111,6 +112,7 @@ document.getElementById('btn-connect4').addEventListener('click', () => {
 document.getElementById('btn-c4-back').addEventListener('click', () => {
     cancelC4Drop();
     sessionClose();
+    c4FocusCol = null; // évite qu'une colonne mémorisée survive à une manche neuve
     showScreen('games');
 });
 
@@ -172,8 +174,14 @@ function renderC4Snapshot(board, { lastMove, line, playable, hint }) {
     // La grille est reconstruite entièrement, ce qui éjecte le focus vers
     // <body>. Mémoriser la colonne au clavier pour la restituer plus bas :
     // - si le focus est sur une colonne, on retient sa position ;
-    // - si le focus est déjà sur <body>, c'est notre propre reconstruction
-    //   précédente qui vient de l'y envoyer : on garde la colonne mémorisée ;
+    // - si le focus est déjà sur <body>, on suppose que c'est notre propre
+    //   reconstruction précédente qui vient de l'y envoyer, et on garde la
+    //   colonne mémorisée — hypothèse qui peut être fausse (chargement de la
+    //   page, perte de focus ailleurs dans l'appli, clic qui ne focus pas le
+    //   bouton selon le navigateur) ; c'est pourquoi les points de sortie du
+    //   plateau (bouton « ← Retour », nettoyage d'écran) remettent
+    //   explicitement c4FocusCol à null, pour ne jamais s'appuyer dessus au
+    //   retour sur une manche neuve ;
     // - sinon, le focus a été déplacé délibérément ailleurs (ex. bouton
     //   « Nouvelle partie ») : on ne le ramène pas de force dans la grille.
     const focused = document.activeElement;
