@@ -481,8 +481,15 @@ func assertEnemyViewIsClean(t *testing.T, label string, state map[string]any, fi
 	// lastShot vaut null hors bataille (placement, manche neuve) : sa forme ne
 	// se vérifie que lorsqu'il porte un tir. Sa clé, elle, est toujours
 	// présente — c'est le verrou de la racine qui s'en charge.
+	//
+	// "sunkName" y figure parce que ce verrou l'a attrapé à l'instant où il a été
+	// ajouté à bsShot, et qu'il a fallu refaire l'argument de sûreté pour
+	// l'admettre : un bateau coulé a toutes ses cases déjà connues des deux
+	// côtés, son nom n'apprend donc rien à personne (voir bsShot dans
+	// battleship.go). C'est le comportement attendu de ce verrou — aucun champ ne
+	// passe sans que quelqu'un l'assume ici.
 	if shot := state["lastShot"]; shot != nil {
-		bsAssertKeys(t, label, "lastShot", shot, []string{"by", "col", "result", "row"})
+		bsAssertKeys(t, label, "lastShot", shot, []string{"by", "col", "result", "row", "sunkName"})
 	}
 
 	// Propriété A : aucune case non tirée ne peut apparaître côté adverse.
@@ -805,16 +812,31 @@ func TestBsSinkKeepsTurnAndNamesTheShip(t *testing.T) {
 	seat := idx + 1
 
 	victim := s.Sides[1-idx].Fleet[3] // Torpilleur, 2 cases : le plus court
+	var raws [2][]byte
 	for _, c := range victim.Cells {
 		act(t, r, shooter, map[string]any{"type": "fire", "row": c.Row, "col": c.Col})
-		expectEvent(t, p0, "bsState")
-		expectEvent(t, p1, "bsState")
+		raws[0] = expectEvent(t, p0, "bsState")
+		raws[1] = expectEvent(t, p1, "bsState")
 	}
 	if s.Turn != seat {
 		t.Fatalf("après un coulé, Turn = %d, attendu %d", s.Turn, seat)
 	}
 	if s.LastShot.Result != "sunk" {
 		t.Fatalf("LastShot.Result = %q, attendu sunk", s.LastShot.Result)
+	}
+
+	// Le nom part sur le FIL, et dans les DEUX vues : c'est ce champ que le front
+	// lit pour annoncer le coulage, au lieu de comparer enemy.sunkShips à un
+	// snapshot précédent — cette comparaison annonçait un nom faux dès qu'un
+	// snapshot était abandonné. Vérifier l'état serveur ne suffirait donc pas.
+	for i, raw := range raws {
+		shot, ok := bsStateOf(t, raw)["lastShot"].(map[string]any)
+		if !ok {
+			t.Fatalf("vue %d : lastShot absent ou non-objet dans %s", i, raw)
+		}
+		if shot["sunkName"] != victim.Name {
+			t.Errorf("vue %d : lastShot.sunkName = %v, attendu %q", i, shot["sunkName"], victim.Name)
+		}
 	}
 
 	view := s.viewFor(idx)

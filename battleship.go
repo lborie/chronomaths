@@ -271,11 +271,26 @@ type bsEnemyView struct {
 	Remaining int      `json:"remaining"`
 }
 
+// bsShot décrit le dernier tir. SunkName ne porte un nom que sur
+// Result == "sunk", et il est calculé par bsFire au moment où le tir s'applique.
+//
+// CE CHAMP NE RÉVÈLE RIEN, dans aucun des deux sens où bsShot part — car il part
+// tel quel aux DEUX joueuses :
+//   - à la tireuse, parce qu'un bateau coulé a toutes ses cases dans
+//     enemy.hits : elle les a tirées une à une, elles lui sont déjà connues ;
+//   - à la victime, parce que c'est son propre bateau, déjà lisible dans
+//     you.ships[i] avec son nom et son drapeau sunk.
+//
+// Toute AUTRE addition à ce struct doit refaire cet argument pour les deux
+// destinataires, sans quoi elle fuite. Pas de json:"omitempty" : le test de
+// confidentialité verrouille le jeu de clés de lastShot, il ne doit pas
+// dépendre du résultat du tir.
 type bsShot struct {
-	Row    int    `json:"row"`
-	Col    int    `json:"col"`
-	By     int    `json:"by"`     // siège de la tireuse : p.Index + 1
-	Result string `json:"result"` // "miss" | "hit" | "sunk"
+	Row      int    `json:"row"`
+	Col      int    `json:"col"`
+	By       int    `json:"by"`       // siège de la tireuse : p.Index + 1
+	Result   string `json:"result"`   // "miss" | "hit" | "sunk"
+	SunkName string `json:"sunkName"` // bateau coulé par ce tir, "" sinon
 }
 
 // bsStateMsg reflète bsRoom À LA MAIN : toute nouvelle propriété de bsRoom doit
@@ -476,14 +491,19 @@ func bsPlay(r *Room, s *bsRoom, p *Player, c bsCell) {
 	}
 
 	me, them := &s.Sides[p.Index], &s.Sides[1-p.Index]
-	// Le nom du bateau coulé n'est pas repris ici : viewFor le recalcule dans
-	// Enemy.SunkShips depuis l'état, ce qui garde le snapshot auto-réparant.
-	result, _, ok := bsFire(them.Fleet, &me.Shots, c)
+	result, sunkName, ok := bsFire(them.Fleet, &me.Shots, c)
 	if !ok {
 		return // hors bornes ou case déjà tirée
 	}
 
-	s.LastShot = &bsShot{Row: c.Row, Col: c.Col, By: seat, Result: result}
+	// sunkName voyage dans le snapshot plutôt que d'être redéduit par le client.
+	// Enemy.SunkShips ne peut pas servir à ça : il est construit en parcourant la
+	// flotte, donc dans l'ordre de bsFleetSpec et jamais dans l'ordre
+	// chronologique des coulages. Un client qui le comparerait au snapshot
+	// précédent annoncerait un nom FAUX — pas seulement une annonce avalée — dès
+	// qu'un snapshot intermédiaire est abandonné, ce que sendEvent fait sur canal
+	// plein. Le snapshot reste ainsi absolu, sans delta.
+	s.LastShot = &bsShot{Row: c.Row, Col: c.Col, By: seat, Result: result, SunkName: sunkName}
 
 	switch {
 	case bsAllSunk(them.Fleet):

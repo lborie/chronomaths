@@ -296,9 +296,10 @@ function applyBsState(state) {
     bsOnline.state = state;
     renderBsSnapshot(state);
     bsUpdateRematch(state);
-    if (animate) bsAnnounceSunk(previous, state);
-
-    if (animate) bsAnimateShot(state.lastShot);
+    if (animate) {
+        bsAnnounceSunk(state);
+        bsAnimateShot(state.lastShot);
+    }
 }
 
 // bsShotChanged compare deux lastShot par leurs coordonnées et leur auteur.
@@ -328,23 +329,31 @@ function bsAnimateShot(shot) {
 // que si le créneau est resté vide, ce qui laisse la priorité à un message
 // d'attente de revanche/placement. C'est aussi ce qui efface l'annonce au tir
 // suivant : bsUpdateRematch l'aura déjà réinitialisée avant le nouvel appel.
-function bsAnnounceSunk(previous, state) {
+function bsAnnounceSunk(state) {
     if (bsEl.rematchStatus.textContent !== '') return;
     const shot = state.lastShot;
     if (!shot || shot.result !== 'sunk') return;
 
     if (shot.by === bsOnline.seat) {
-        // Le bateau adverse coulé : le nom NOUVELLEMENT apparu dans
-        // enemy.sunkShips, jamais le dernier élément — ce tableau suit l'ordre
-        // de la flotte (bsFleetSpec), pas l'ordre chronologique des coulages.
-        const before = new Set((previous && previous.enemy && previous.enemy.sunkShips) || []);
-        const name = (state.enemy.sunkShips || []).find((n) => !before.has(n));
-        if (name) bsEl.rematchStatus.textContent = `☠️ Tu as coulé le ${name} !`;
+        // Le bateau adverse coulé : le nom vient du SERVEUR, qui l'a calculé en
+        // appliquant le tir. AUCUN delta entre deux snapshots ici.
+        //
+        // enemy.sunkShips ne peut pas servir à le retrouver : ce tableau suit
+        // l'ordre de la flotte (bsFleetSpec), pas l'ordre chronologique des
+        // coulages. Le comparer au snapshot précédent annonçait donc un nom
+        // FAUX — et non une annonce simplement avalée — dès qu'un snapshot
+        // intermédiaire était abandonné, ce que sendEvent fait sur canal plein :
+        // je coule le Croiseur (snapshot perdu) puis le Torpilleur, et le nom
+        // « nouvellement apparu » remonte le Croiseur.
+        //
+        // shot.sunkName ne révèle rien : voir le commentaire de bsShot dans
+        // battleship.go.
+        if (shot.sunkName) bsEl.rematchStatus.textContent = `☠️ Tu as coulé le ${shot.sunkName} !`;
         return;
     }
 
-    // Mon bateau coulé : déterministe, pas besoin de comparaison — on cherche
-    // celui dont les cases couvrent les coordonnées du dernier tir.
+    // Mon bateau coulé : déterministe et déjà sans delta, laissé inchangé — on
+    // cherche celui dont les cases couvrent les coordonnées du dernier tir.
     const ship = (state.you.ships || []).find(
         (s) => s.sunk && s.cells.some((c) => c.row === shot.row && c.col === shot.col)
     );
