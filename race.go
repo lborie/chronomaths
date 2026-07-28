@@ -42,9 +42,14 @@ type raceState struct {
 }
 
 type Question struct {
-	A      int `json:"a"`
-	B      int `json:"b"`
-	Answer int `json:"answer"`
+	A int `json:"a"`
+	B int `json:"b"`
+	// Answer n'est jamais sérialisé : la question part au client dans les
+	// events "start" et "scoreUpdate", avant qu'il ne réponde. Un joueur
+	// lisant son propre flux SSE gagnerait à coup sûr. Le serveur garde la
+	// réponse pour valider (voir Action) et ne la révèle qu'après coup, via
+	// ScoreUpdateMsg.CorrectAnswer.
+	Answer int `json:"-"`
 }
 
 type StartMsg struct {
