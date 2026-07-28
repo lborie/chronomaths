@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chronomaths-v13';
+const CACHE_NAME = 'chronomaths-v14';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

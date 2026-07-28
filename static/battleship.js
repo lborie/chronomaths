@@ -84,7 +84,11 @@ function renderBsSnapshot(state) {
     bsEl.fire.style.display = state.phase === 'battle' ? 'block' : 'none';
     bsEl.fire.disabled = !(state.yourTurn && bsAimed);
 
-    bsEl.status.textContent = bsStatusText(state);
+    // bsStatusText n'a pas de terme "lost" (elle appartient à la tâche 3, qui
+    // ignore le mode en ligne) : sans ce || , un snapshot tardif après
+    // showBsLost écraserait le message reçu par un texte de tour de jeu, alors
+    // même que la grille reste verrouillée par le fold de yourTurn ci-dessus.
+    bsEl.status.textContent = bsOnline.lost || bsStatusText(state);
     bsEl.score.textContent = `🚢 ${state.wins[0]} – ${state.wins[1]} 🚢`;
 
     bsRestoreFocus();
@@ -278,6 +282,13 @@ function joinBattleshipOnline(name) {
 function applyBsState(state) {
     state.iAmReady = state.ready[bsOnline.seat - 1] === true;
     state.iWon = state.winner === bsOnline.seat;
+    // Un bsState tardif n'est pas sérialisé par le même verrou qu'un
+    // opponentLeft côté serveur (handleDisconnect tient globalMu, Action tient
+    // room.mu) : il peut donc arriver APRÈS que showBsLost ait déjà verrouillé
+    // la partie. Ce terme unique protège cell.disabled et fire.disabled, tous
+    // deux dérivés de yourTurn dans renderBsSnapshot, sans quoi un tel snapshot
+    // réactiverait silencieusement la grille.
+    state.yourTurn = state.yourTurn && !bsOnline.lost;
 
     const previous = bsOnline.state;
     const animate = bsShotChanged(previous && previous.lastShot, state.lastShot);
@@ -285,6 +296,7 @@ function applyBsState(state) {
     bsOnline.state = state;
     renderBsSnapshot(state);
     bsUpdateRematch(state);
+    if (animate) bsAnnounceSunk(previous, state);
 
     if (animate) bsAnimateShot(state.lastShot);
 }
@@ -307,6 +319,36 @@ function bsAnimateShot(shot) {
         : `.bs-mini-cell:nth-child(${shot.row * BS_SIZE + shot.col + 1})`;
     const cell = container.querySelector(sel);
     if (cell) cell.classList.add('bs-cell-boom');
+}
+
+// bsAnnounceSunk annonce, dans le créneau de #bs-rematch-status, le nom du
+// bateau qui vient d'être coulé — dans les deux sens. bsUpdateRematch (appelé
+// juste avant) écrit TOUJOURS ce champ avant que cette fonction ne s'exécute —
+// un message d'attente s'il y a lieu, sinon la chaîne vide : on n'annonce donc
+// que si le créneau est resté vide, ce qui laisse la priorité à un message
+// d'attente de revanche/placement. C'est aussi ce qui efface l'annonce au tir
+// suivant : bsUpdateRematch l'aura déjà réinitialisée avant le nouvel appel.
+function bsAnnounceSunk(previous, state) {
+    if (bsEl.rematchStatus.textContent !== '') return;
+    const shot = state.lastShot;
+    if (!shot || shot.result !== 'sunk') return;
+
+    if (shot.by === bsOnline.seat) {
+        // Le bateau adverse coulé : le nom NOUVELLEMENT apparu dans
+        // enemy.sunkShips, jamais le dernier élément — ce tableau suit l'ordre
+        // de la flotte (bsFleetSpec), pas l'ordre chronologique des coulages.
+        const before = new Set((previous && previous.enemy && previous.enemy.sunkShips) || []);
+        const name = (state.enemy.sunkShips || []).find((n) => !before.has(n));
+        if (name) bsEl.rematchStatus.textContent = `☠️ Tu as coulé le ${name} !`;
+        return;
+    }
+
+    // Mon bateau coulé : déterministe, pas besoin de comparaison — on cherche
+    // celui dont les cases couvrent les coordonnées du dernier tir.
+    const ship = (state.you.ships || []).find(
+        (s) => s.sunk && s.cells.some((c) => c.row === shot.row && c.col === shot.col)
+    );
+    if (ship) bsEl.rematchStatus.textContent = `☠️ Ton ${ship.name} est coulé !`;
 }
 
 // bsUpdateRematch affiche l'attente, en placement comme après la manche. Le
@@ -338,7 +380,6 @@ function bsUpdateRematch(state) {
 // REÇU et non un texte en dur : une déconnexion d'adversaire et une perte de
 // connexion ne se disent pas de la même façon.
 function showBsLost(message) {
-    bsOnline.lost = message;
     sessionClose();
 
     if (getActiveScreen() !== 'battleship' || !bsOnline.state) {
@@ -346,6 +387,7 @@ function showBsLost(message) {
         return;
     }
 
+    bsOnline.lost = message;
     bsEl.status.textContent = message;
     bsEl.replay.style.display = 'none';
     bsEl.shuffle.style.display = 'none';
@@ -363,8 +405,12 @@ bsEl.replay.addEventListener('click', () => sessionSend({ type: 'rematch' }));
 bsEl.fire.addEventListener('click', () => {
     if (!bsAimed) return;
     const { row, col } = bsAimed;
-    // On efface la visée tout de suite : le bouton se désactive, ce qui interdit
-    // un double envoi pendant l'aller-retour, sans drapeau de lock.
+    // On efface la visée tout de suite : le bouton se désactive tant que la
+    // visée reste vide. Ça n'interdit pas tout double envoi : si l'utilisatrice
+    // vise une AUTRE case pendant l'aller-retour, bsAim relit l'état pré-tir
+    // (yourTurn encore vrai) et réactive le bouton — un second tir peut alors
+    // partir avant la réponse au premier. Sans conséquence : le serveur valide
+    // chaque tir indépendamment, sans drapeau de lock côté client.
     bsAimed = null;
     if (bsOnline.state) renderBsSnapshot(bsOnline.state);
     sessionSend({ type: 'fire', row, col });
