@@ -14,6 +14,7 @@
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="games.css">
+    <link rel="stylesheet" href="/battleship.css">
 </head>
 <body>
     <div class="container">
@@ -479,6 +480,15 @@
                     <span class="multi-arrow">→</span>
                 </button>
 
+                <button id="btn-battleship-online" class="multi-btn bs-entry-btn">
+                    <span class="multi-icon">🚢</span>
+                    <span class="multi-text">
+                        <span class="multi-title">Bataille navale en ligne</span>
+                        <span class="multi-details">2 joueurs, chacun son écran</span>
+                    </span>
+                    <span class="multi-arrow">→</span>
+                </button>
+
                 <button id="btn-games-back" class="back-btn" style="margin-top:1rem;">← Retour</button>
             </div>
         </div>
@@ -504,10 +514,41 @@
                 </div>
             </div>
         </div>
+
+        <!-- Écran Bataille navale -->
+        <div id="screen-battleship" class="screen">
+            <div class="bs-container">
+                <span id="bs-score" class="bs-score">🚢 0 – 0 🚢</span>
+                <p id="bs-status" class="bs-status">Place ta flotte</p>
+
+                <div id="bs-grid" class="bs-grid"></div>
+
+                <div class="bs-aim">
+                    <span id="bs-aim-label" class="bs-aim-label"></span>
+                    <button id="btn-bs-fire" class="bs-fire-btn" disabled>🎯 Feu !</button>
+                </div>
+
+                <div id="bs-minimap-wrap" class="bs-minimap-wrap">
+                    <span class="bs-minimap-title">Ta flotte</span>
+                    <div id="bs-minimap" class="bs-minimap"></div>
+                </div>
+
+                <div class="bs-actions">
+                    <button id="btn-bs-shuffle" class="bs-shuffle-btn">🎲 Mélanger</button>
+                    <button id="btn-bs-ready" class="bs-ready-btn">✓ Je suis prête</button>
+                    <button id="btn-bs-replay" class="play-again-btn">
+                        <span id="bs-replay-label">Nouvelle manche</span>
+                    </button>
+                    <p id="bs-rematch-status" class="bs-rematch-status"></p>
+                    <button id="btn-bs-back" class="back-btn">← Retour</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
     <script src="games.js"></script>
+    <script src="/battleship.js"></script>
     <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js');
