@@ -29,6 +29,8 @@ Tous les modes sont disponibles pour les quatre opérations (sauf opérations po
 | 📖 Révision par table/nombre | 2 min | 18 | Ciblé |
 | 🏁 Multi joueur | — | 20 pts | Course |
 
+Le mode **🏁 Multi joueur** oppose deux joueurs, chacun sur son écran : on saisit son prénom, puis on attend un adversaire — le bouton **« ← Annuler »** permet de quitter l'attente à tout moment. La course de calcul démarre dès qu'un second joueur rejoint.
+
 ### Déroulement d'une partie
 
 1. **Choix de l'opération** : Additions, Soustractions, Multiplications ou Divisions
@@ -43,13 +45,12 @@ Une section détente, accessible depuis l'accueil via le bouton **🎮 Jeux**.
 
 #### Puissance 4
 
-Deux joueurs s'affrontent **sur le même appareil**, chacun son tour.
+On clique (ou on touche) une colonne pour y laisser tomber son jeton. Le premier à aligner **4 jetons** — horizontalement, verticalement ou en diagonale — gagne : l'alignement gagnant se met à clignoter. Si le plateau se remplit sans alignement, c'est **match nul**. Deux façons d'y jouer :
 
-- 🔴 **Rouge** commence la première partie, 🟡 **Jaune** joue en second.
-- On clique (ou on touche) une colonne pour y laisser tomber son jeton.
-- Le premier à aligner **4 jetons** — horizontalement, verticalement ou en diagonale — gagne : l'alignement gagnant se met à clignoter.
-- Si le plateau se remplit sans alignement, c'est **match nul**.
-- Le **score des manches** est conservé tant qu'on reste sur l'écran, et le joueur qui commence alterne à chaque nouvelle partie.
+- **🔴 Puissance 4** — 2 joueurs sur le même appareil, chacun son tour. Score de manches conservé, le joueur qui commence alterne à chaque nouvelle partie.
+- **🌍 Puissance 4 en ligne** — 2 joueurs, chacun sur son écran. Chaque joueur saisit son prénom, le premier arrivé attend un adversaire. Le premier connecté joue 🔴 Rouge, le second 🟡 Jaune. Le score de manches est conservé et, pour relancer une manche, **les deux joueurs doivent cliquer sur « Nouvelle manche »** ; le joueur qui commence alterne.
+
+Si un joueur quitte la partie, l'autre est prévenu et peut revenir au hub Jeux. Un joueur qui laisse simplement son onglet ouvert sans jouer bloque la partie : il n'y a pas de minuteur de tour.
 
 Aucun calcul n'est demandé : c'est une récompense entre deux séries d'entraînement.
 
@@ -102,7 +103,12 @@ L'application est accessible sur http://localhost:8080
 
 ```
 chronomaths/
-├── main.go              # Serveur HTTP Go
+├── main.go              # Serveur HTTP : embed, routes, main()
+├── session.go           # Session générique 2 joueurs : matchmaking, SSE, déconnexion
+├── session_test.go      # Tests de la session générique
+├── race.go              # Course de fusées : génération des questions + jeu
+├── connect4.go          # Puissance 4 : logique pure + jeu en ligne
+├── connect4_test.go     # Tests de la logique de plateau et du jeu en ligne
 ├── go.mod               # Module Go
 ├── README.md
 └── static/
@@ -118,7 +124,7 @@ chronomaths/
 
 ### Backend (Go)
 
-Le serveur gère les fichiers statiques et le mode multijoueur via SSE (Server-Sent Events) :
+Le serveur gère les fichiers statiques et les jeux à deux joueurs via SSE (Server-Sent Events) :
 - `embed.FS` pour embarquer les fichiers statiques dans le binaire
 - `http.FileServer` pour servir les fichiers
 - SSE (`GET /api/events`) pour les mises à jour serveur→client en temps réel
@@ -126,6 +132,8 @@ Le serveur gère les fichiers statiques et le mode multijoueur via SSE (Server-S
 - Support des quatre opérations (addition, soustraction, multiplication, division) côté serveur
 - Zéro dépendance externe (standard library uniquement)
 - Port par défaut : 8080
+
+`session.go` porte le matchmaking et le flux SSE sans connaître aucune règle de jeu : il délègue aux jeux, qui s'y enregistrent chacun de leur côté. Deux jeux l'utilisent aujourd'hui : la **course de fusées** (`race.go`, une file d'attente par opération) et le **Puissance 4 en ligne** (`connect4.go`, une seule file). Pour le Puissance 4, le plateau qui fait foi est celui du serveur : le client envoie la colonne jouée et n'affiche que l'état complet renvoyé, ce qui rend impossible de jouer hors de son tour depuis un client modifié.
 
 ```go
 //go:embed static/*
@@ -142,7 +150,7 @@ var staticFiles embed.FS
 | `style.css` | Variables CSS, responsive, animations |
 | `games.css` | Styles du hub Jeux et du plateau Puissance 4 |
 | `app.js` | Machine à états, génération questions (+, −, ×, ÷), timer |
-| `games.js` | Puissance 4 : logique pure (sans DOM) + rendu et interactions |
+| `games.js` | Puissance 4 : logique pure (sans DOM), rendu et interactions, mode en ligne |
 
 `games.css` et `games.js` sont chargés **après** `style.css` et `app.js` : ce sont des scripts classiques, et `games.js` résout `screens`, `showScreen` et `screenCleanups` par portée lexicale globale.
 

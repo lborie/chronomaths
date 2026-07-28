@@ -103,6 +103,30 @@
     cursor: default;
 }
 
+/* Sur écran étroit, les 7 colonnes se disputent la largeur : on rend au
+   plateau les pixels des paddings horizontaux plutôt que de rétrécir les
+   cellules, qui portent la cible tactile. Le gap reste à 3px : en dessous,
+   la grille cesse de se lire comme un Puissance 4.
+   Le seuil des 44px n'est pas atteignable sous ~382px de large : 7 colonnes
+   à 44px réclament 308px, or un écran de 320px n'offre que 288px utiles hors
+   safe-area. Mesuré après ce correctif : ~35px à 320px, 43px à 375px,
+   45px à 390px. La colonne reste haute de 263px, sans zone morte. */
+@media (max-width: 480px) {
+    .c4-container {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    .c4-board {
+        padding: 4px;
+        gap: 3px;
+    }
+
+    .c4-col {
+        gap: 3px;
+    }
+}
+
 .c4-cell {
     aspect-ratio: 1;
     background: var(--c4-hole);
@@ -153,16 +177,50 @@
     gap: 0.5rem;
 }
 
-.c4-actions .back-btn {
-    min-height: 44px;
-}
-
 .c4-rematch-status {
     min-height: 1.25rem;
     text-align: center;
     color: var(--text-light);
     font-size: 0.95rem;
     font-weight: 600;
+}
+
+/* Paysage court : l'habillage occupait 325px des 360px disponibles, dont 137px
+   pour la seule pile d'actions. On la met en rangée et on resserre les marges
+   verticales. Le plateau n'est volontairement PAS borné par la hauteur : un
+   plateau de 6 rangées entièrement visible imposerait des colonnes d'environ
+   28px, sous la cible tactile. La page défile donc encore verticalement en
+   paysage — jamais horizontalement. */
+@media (max-height: 500px) and (orientation: landscape) {
+    .c4-container {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .c4-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 0.5rem;
+    }
+
+    /* .play-again-btn est en width:100% et partagé par d'autres écrans :
+       on ne le dé-étire que dans la rangée d'actions du plateau, sinon il
+       occupe une ligne entière et repousse « ← Retour » en dessous. */
+    .c4-actions .play-again-btn {
+        width: auto;
+        padding: 0.75rem 1.25rem;
+    }
+
+    /* order: -1 remonte le statut au-dessus des boutons. Sans lui, sa
+       flex-basis de 100% s'intercale entre « Nouvelle partie » et
+       « ← Retour » et force le retour à la ligne que la rangée cherche
+       justement à éviter. */
+    .c4-rematch-status {
+        flex-basis: 100%;
+        min-height: 0;
+        order: -1;
+    }
 }
 
 /* ============================================================

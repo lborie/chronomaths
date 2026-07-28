@@ -102,7 +102,7 @@ function cancelC4Drop() {
 screenCleanups.connect4 = () => {
     cancelC4Drop();
     sessionClose();
-    c4FocusCol = null; // évite qu'une colonne mémorisée survive à une manche neuve
+    c4FocusCol = null; // on quitte le plateau : à la prochaine entrée, aucune colonne ne doit resurgir (btn-c4-replay reste sur place et ne fait pas ce nettoyage)
 };
 
 // ============================================================
@@ -137,7 +137,7 @@ document.getElementById('btn-connect4-online').addEventListener('click', () => {
 document.getElementById('btn-c4-back').addEventListener('click', () => {
     cancelC4Drop();
     sessionClose();
-    c4FocusCol = null; // évite qu'une colonne mémorisée survive à une manche neuve
+    c4FocusCol = null; // on quitte le plateau : à la prochaine entrée, aucune colonne ne doit resurgir (btn-c4-replay reste sur place et ne fait pas ce nettoyage)
     showScreen('games');
 });
 
@@ -500,7 +500,7 @@ function showC4Lost(message) {
     sessionClose();
 
     if (getActiveScreen() !== 'connect4' || !c4Online.state) {
-        setWaitingStatus('Connexion perdue');
+        setWaitingStatus(message);
         return;
     }
 

@@ -1351,7 +1351,14 @@ poseeEl.btnReplay.addEventListener('click', () => {
 const session = {
     eventSource: null,
     playerId: null,
-    name: ''
+    name: '',
+    // Identifie la tentative de connexion en cours. sessionJoin() attend la
+    // réponse de POST /api/join, et pendant cette attente l'utilisateur peut
+    // annuler (« ← Annuler ») ou relancer un join. Sans ce compteur, la
+    // réponse tardive réinstallait un playerId et un flux SSE que plus aucun
+    // écran ne pilotait : le joueur restait dans la file du serveur, puis se
+    // retrouvait projeté sur le plateau alors qu'il était revenu au hub.
+    epoch: 0
 };
 
 // Ouvre une session : POST /api/join puis branchement du flux SSE.
@@ -1362,6 +1369,9 @@ const session = {
 async function sessionJoin({ game, operation, name, on, onLost, onError }) {
     sessionClose();
     session.name = name;
+    // Capturé après sessionClose(), qui incrémente le compteur : toute
+    // annulation ou relance ultérieure rendra cette valeur périmée.
+    const epoch = session.epoch;
 
     let playerId;
     try {
@@ -1371,14 +1381,20 @@ async function sessionJoin({ game, operation, name, on, onLost, onError }) {
             body: JSON.stringify({ game, name, operation })
         });
         if (!res.ok) {
-            if (onError) onError();
+            if (session.epoch === epoch && onError) onError();
             return false;
         }
         playerId = (await res.json()).playerId;
     } catch (err) {
-        if (onError) onError();
+        if (session.epoch === epoch && onError) onError();
         return false;
     }
+
+    // Session annulée ou remplacée pendant l'aller-retour : on n'ouvre pas de
+    // flux et on ne touche pas à l'état, sinon on ressuscite une session que
+    // l'utilisateur a quittée. Le joueur resté côté serveur n'a jamais ouvert
+    // son SSE : watchGhost le récupère au bout de 30 s.
+    if (session.epoch !== epoch) return false;
 
     session.playerId = playerId;
 
@@ -1413,8 +1429,10 @@ function sessionSend(payload) {
     });
 }
 
-// Ferme la session. Sans effet si aucune session n'est ouverte.
+// Ferme la session. Sans effet si aucune session n'est ouverte — sauf sur
+// l'époque, toujours incrémentée : c'est ce qui périme un join encore en vol.
 function sessionClose() {
+    session.epoch++;
     if (session.eventSource) {
         session.eventSource.close();
         session.eventSource = null;

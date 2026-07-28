@@ -1,6 +1,9 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"log"
+)
 
 // ============================================================
 // PUISSANCE 4 — LOGIQUE PURE
@@ -137,6 +140,8 @@ type C4StateEvent struct {
 	State c4StateMsg `json:"state"`
 }
 
+// snapshot() copie c4Room champ à champ : toute nouvelle propriété de
+// c4Room doit être reportée ici aussi, sinon elle n'atteint jamais le client.
 func (s *c4Room) snapshot() c4StateMsg {
 	return c4StateMsg{
 		Board:    s.Board,
@@ -154,7 +159,7 @@ func (s *c4Room) snapshot() c4StateMsg {
 }
 
 // startRound remet le plateau à zéro. starter est la couleur qui commence.
-// Wins et Round survivent à l'appel.
+// Wins survit à l'appel ; Round est incrémenté.
 func (s *c4Room) startRound(starter int) {
 	s.Board = c4CreateBoard()
 	s.Starter = starter
@@ -189,6 +194,7 @@ func (connect4Game) Action(r *Room, p *Player, raw json.RawMessage) {
 		Col  int    `json:"col"`
 	}
 	if err := json.Unmarshal(raw, &d); err != nil {
+		log.Printf("[C4] action illisible de %s: %v", p.Name, err)
 		return
 	}
 

@@ -390,6 +390,11 @@ func TestC4OnlineRematchNeedsBothPlayers(t *testing.T) {
 	}
 }
 
+// c4MaxFillNodes borne la recherche de c4FillNoWin : sans elle, une
+// régression de c4FindWin transformerait ce test en attente jusqu'au
+// timeout de 10 minutes du paquet, au lieu d'un échec lisible.
+const c4MaxFillNodes = 100000
+
 // c4FillNoWin construit un plateau plein sans aucun alignement, par recherche
 // avec retour arrière. Les plateaux nuls existent en 6×7, la recherche aboutit
 // donc toujours, et elle est déterministe : le même plateau à chaque exécution.
@@ -406,8 +411,13 @@ func c4FillNoWin(t *testing.T) C4Board {
 		}
 	}
 
+	nodes := 0
 	var fill func(i int) bool
 	fill = func(i int) bool {
+		nodes++
+		if nodes > c4MaxFillNodes {
+			t.Fatalf("c4FillNoWin: recherche non convergente après %d nœuds, arrêtée à la case %d/%d", nodes, i, len(cells))
+		}
 		if i == len(cells) {
 			return true
 		}
