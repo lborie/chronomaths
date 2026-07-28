@@ -52,8 +52,6 @@ On clique (ou on touche) une colonne pour y laisser tomber son jeton. Le premier
 
 Si un joueur quitte la partie, l'autre est prévenu et peut revenir au hub Jeux. Un joueur qui laisse simplement son onglet ouvert sans jouer bloque la partie : il n'y a pas de minuteur de tour.
 
-Aucun calcul n'est demandé : c'est une récompense entre deux séries d'entraînement.
-
 #### Bataille navale en ligne
 
 2 joueuses, chacune sur son écran. Le jeu n'existe qu'en ligne : chacune doit pouvoir cacher sa flotte à l'autre.
