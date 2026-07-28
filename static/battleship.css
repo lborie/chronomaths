@@ -219,3 +219,15 @@
         background: var(--primary-light);
     }
 }
+
+/* Posée sur la seule case du dernier tir. Le reset universel de style.css
+   la neutralise sous prefers-reduced-motion. */
+.bs-cell-boom {
+    animation: bsBoom 0.4s ease-out;
+}
+
+@keyframes bsBoom {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}

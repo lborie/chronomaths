@@ -38,8 +38,8 @@ let bsCurrentState = null;
 
 // Le snapshot serveur est SYMÉTRIQUE : il ne dit pas quel siège je suis, parce
 // que `ready`, `wins` et `winner` sont indexés par siège et identiques pour les
-// deux joueuses. Deux drapeaux dérivés comblent ce manque, posés avant le rendu
-// par applyBsState (tâche 4) et à la main par l'état de démonstration (tâche 3) :
+// deux joueuses. Deux drapeaux dérivés comblent ce manque, posés avant chaque
+// rendu par applyBsState :
 //   state.iAmReady = state.ready[bsOnline.seat - 1]
 //   state.iWon     = state.winner === bsOnline.seat
 
@@ -207,70 +207,181 @@ function bsStatusText(state) {
     return state.yourTurn ? '🎯 À toi de tirer !' : '⏳ Au tour de ton adversaire';
 }
 
-// ------------------------------------------------------------
-// État de démonstration — remplacé par la session en tâche 4.
-// Il existe pour valider l'affichage, le responsive et le clavier sans serveur.
-// ------------------------------------------------------------
-function bsDemoState(phase) {
-    const ships = [
-        { name: 'Porte-avions', cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }], sunk: false },
-        { name: 'Croiseur', cells: [{ row: 2, col: 5 }, { row: 3, col: 5 }, { row: 4, col: 5 }], sunk: false },
-        { name: 'Sous-marin', cells: [{ row: 1, col: 2 }, { row: 2, col: 2 }, { row: 3, col: 2 }], sunk: false },
-        { name: 'Torpilleur', cells: [{ row: 6, col: 6 }, { row: 7, col: 6 }], sunk: true }
-    ];
-    return {
-        phase,
-        you: { ships, hits: [{ row: 6, col: 6 }, { row: 7, col: 6 }], misses: [{ row: 5, col: 1 }] },
-        enemy: { hits: [{ row: 3, col: 4 }, { row: 4, col: 4 }], misses: [{ row: 1, col: 1 }, { row: 6, col: 2 }], sunkShips: [], remaining: 4 },
-        yourTurn: phase === 'battle',
-        ready: [false, false],
-        over: phase === 'over',
-        winner: 0,
-        lastShot: null,
-        wins: [1, 0],
-        rematch: [false, false],
-        round: 1,
-        iAmReady: false,
-        iWon: true
-    };
-}
-
 document.getElementById('btn-battleship-online').addEventListener('click', () => {
+    showJoinScreen({
+        emojiLeft: '🚢',
+        title: 'Bataille navale en ligne',
+        emojiRight: '💥',
+        subtitle: 'Trouve un adversaire !',
+        waitingEmoji: '🚢',
+        back: 'games',
+        onSubmit: joinBattleshipOnline
+    });
+});
+
+// ------------------------------------------------------------
+// MODE EN LIGNE
+// Le serveur fait autorité : on envoie une case, on affiche le snapshot.
+// ------------------------------------------------------------
+const bsOnline = {
+    seat: 0,            // 1 ou 2
+    myName: '',
+    opponentName: '',
+    state: null,        // dernier snapshot rendu
+    lost: ''            // message de fin anormale, '' si tout va bien
+};
+
+function joinBattleshipOnline(name) {
+    bsOnline.seat = 0;
+    bsOnline.myName = name;
+    bsOnline.opponentName = '';
+    bsOnline.state = null;
+    bsOnline.lost = '';
     bsAimed = null;
     bsFocusCell = null;
-    renderBsSnapshot(bsDemoState('placement'));
-    showScreen('battleship');
-});
 
-bsEl.shuffle.addEventListener('click', () => {
-    // En tâche 4 : sessionSend({type:'shuffle'}).
-    renderBsSnapshot(bsDemoState('placement'));
-});
+    // Affiche l'écran d'attente tout de suite, sans attendre la réponse du
+    // serveur : sans cet appel, l'écran de jonction resterait affiché jusqu'à
+    // l'event "start", et le waitingTilt d'une précédente course de fusées
+    // pourrait rester posé sur l'emoji (voir toggle dans showWaitingScreen).
+    showWaitingScreen(name);
 
-bsEl.ready.addEventListener('click', () => {
-    // En tâche 4 : sessionSend({type:'ready'}).
-    renderBsSnapshot(bsDemoState('battle'));
-});
+    sessionJoin({
+        game: 'battleship',
+        name,
+        on: {
+            waiting: () => setWaitingStatus(''),
+            start: (msg) => {
+                bsOnline.seat = msg.seat;
+                bsOnline.opponentName = msg.opponent;
+                showScreen('battleship');
+                applyBsState(msg.state);
+            },
+            bsState: (msg) => applyBsState(msg.state),
+            opponentLeft: () => showBsLost('🚪 Adversaire déconnecté')
+        },
+        onLost: () => showBsLost('📡 Connexion perdue'),
+        onError: () => setWaitingStatus('Connexion impossible')
+    });
+}
+
+// applyBsState pose les deux drapeaux dérivés que le snapshot symétrique ne
+// porte pas, décide s'il y a lieu d'animer, puis rend.
+//
+// L'animation ne se déclenche que si les COORDONNÉES de lastShot ont changé
+// depuis le snapshot précédemment rendu. Deux discriminants seraient faux :
+//   - le nom de l'event : une demande de revanche rediffuse le même lastShot,
+//     ce qui rejouerait l'explosion du tir de la manche déjà terminée ;
+//   - state.round : il s'incrémente précisément sur le seul snapshot qui ne
+//     doit PAS s'animer, le début d'une manche neuve.
+// C'est la leçon du commit fd3cd29 sur le Puissance 4, transposée.
+function applyBsState(state) {
+    state.iAmReady = state.ready[bsOnline.seat - 1] === true;
+    state.iWon = state.winner === bsOnline.seat;
+
+    const previous = bsOnline.state;
+    const animate = bsShotChanged(previous && previous.lastShot, state.lastShot);
+
+    bsOnline.state = state;
+    renderBsSnapshot(state);
+    bsUpdateRematch(state);
+
+    if (animate) bsAnimateShot(state.lastShot);
+}
+
+// bsShotChanged compare deux lastShot par leurs coordonnées et leur auteur.
+function bsShotChanged(before, now) {
+    if (!now) return false;
+    if (!before) return true;
+    return before.row !== now.row || before.col !== now.col || before.by !== now.by;
+}
+
+// bsAnimateShot marque brièvement la case touchée. La classe est posée sur la
+// seule case du dernier tir, jamais sur toutes les cases : sinon chaque rendu
+// rejouerait l'animation de l'ensemble de la grille.
+function bsAnimateShot(shot) {
+    const mine = shot.by === bsOnline.seat;
+    const container = mine ? bsEl.grid : bsEl.minimap;
+    const sel = mine
+        ? `.bs-cell-target[data-row="${shot.row}"][data-col="${shot.col}"]`
+        : `.bs-mini-cell:nth-child(${shot.row * BS_SIZE + shot.col + 1})`;
+    const cell = container.querySelector(sel);
+    if (cell) cell.classList.add('bs-cell-boom');
+}
+
+// bsUpdateRematch affiche l'attente, en placement comme après la manche. Le
+// snapshot porte ready[] et rematch[] pour les deux sièges : on peut donc dire
+// précisément qui l'on attend.
+function bsUpdateRematch(state) {
+    const meIdx = bsOnline.seat - 1;
+    const otherIdx = 1 - meIdx;
+    const other = bsOnline.opponentName || 'ton adversaire';
+
+    if (bsOnline.lost) {
+        bsEl.replay.style.display = 'none';
+        bsEl.rematchStatus.textContent = '';
+        return;
+    }
+
+    if (state.phase === 'placement' && state.ready[meIdx] && !state.ready[otherIdx]) {
+        bsEl.rematchStatus.textContent = `⏳ En attente de ${other}…`;
+        return;
+    }
+    if (state.over && state.rematch[meIdx] && !state.rematch[otherIdx]) {
+        bsEl.rematchStatus.textContent = `⏳ En attente de ${other}…`;
+        return;
+    }
+    bsEl.rematchStatus.textContent = '';
+}
+
+// showBsLost verrouille la partie sur une fin anormale. Il affiche le MESSAGE
+// REÇU et non un texte en dur : une déconnexion d'adversaire et une perte de
+// connexion ne se disent pas de la même façon.
+function showBsLost(message) {
+    bsOnline.lost = message;
+    sessionClose();
+
+    if (getActiveScreen() !== 'battleship' || !bsOnline.state) {
+        setWaitingStatus(message);
+        return;
+    }
+
+    bsEl.status.textContent = message;
+    bsEl.replay.style.display = 'none';
+    bsEl.shuffle.style.display = 'none';
+    bsEl.ready.style.display = 'none';
+    bsEl.fire.style.display = 'none';
+    bsEl.rematchStatus.textContent = '';
+    // Le verrou reste porté par le DOM : on désactive toutes les cases.
+    bsEl.grid.querySelectorAll('.bs-cell-target').forEach((c) => { c.disabled = true; });
+}
+
+bsEl.shuffle.addEventListener('click', () => sessionSend({ type: 'shuffle' }));
+bsEl.ready.addEventListener('click', () => sessionSend({ type: 'ready' }));
+bsEl.replay.addEventListener('click', () => sessionSend({ type: 'rematch' }));
 
 bsEl.fire.addEventListener('click', () => {
-    // En tâche 4 : sessionSend({type:'fire', row, col}).
+    if (!bsAimed) return;
+    const { row, col } = bsAimed;
+    // On efface la visée tout de suite : le bouton se désactive, ce qui interdit
+    // un double envoi pendant l'aller-retour, sans drapeau de lock.
     bsAimed = null;
-    renderBsSnapshot(bsDemoState('battle'));
-});
-
-bsEl.replay.addEventListener('click', () => {
-    renderBsSnapshot(bsDemoState('placement'));
+    if (bsOnline.state) renderBsSnapshot(bsOnline.state);
+    sessionSend({ type: 'fire', row, col });
 });
 
 bsEl.back.addEventListener('click', () => {
+    sessionClose();
     bsAimed = null;
     bsFocusCell = null;
     showScreen('games');
 });
 
-// La tâche 4 y ajoutera sessionClose().
+// Nettoyage déclenché aussi par la navigation arrière du navigateur.
 screenCleanups.battleship = () => {
+    sessionClose();
     bsAimed = null;
     bsFocusCell = null;
     bsCurrentState = null;
+    bsOnline.state = null;
 };
