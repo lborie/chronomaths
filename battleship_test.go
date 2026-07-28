@@ -433,19 +433,34 @@ func assertEnemyViewIsClean(t *testing.T, label string, state map[string]any, fi
 
 	// Propriété B : la forme de la vue adverse est verrouillée. Un champ
 	// ajouté plus tard échoue ici plutôt que de passer inaperçu.
+	//
+	// t.Errorf, PAS t.Fatalf : les propriétés A et B auditent deux fuites
+	// différentes et doivent pouvoir échouer indépendamment l'une de l'autre.
+	// Une régression peut faire fuiter une case via une clé EXISTANTE (par ex.
+	// enemy.Misses rempli d'une case jamais tirée) sans toucher au jeu de clés
+	// — seule la propriété A l'attraperait. Si B interrompt le test avant que
+	// A ne s'exécute (t.Fatalf), cette classe de fuite reste invisible tant
+	// que la forme ne bouge pas : la propriété la plus robuste — celle qui ne
+	// dépend d'aucun nom de champ — serait alors la seule à ne jamais pouvoir
+	// s'exprimer. C'est exactement ce qu'a révélé le contrôle négatif du
+	// Step 6 dans sa forme initiale : le champ ajouté déclenchait B avant que
+	// la boucle de A n'ait la moindre chance de tourner.
 	enemy, ok := state["enemy"]
 	if !ok {
 		t.Fatalf("%s: clé \"enemy\" absente", label)
 	}
 	want := []string{"hits", "misses", "remaining", "sunkShips"}
 	if got := bsKeys(t, enemy); !reflect.DeepEqual(got, want) {
-		t.Fatalf("%s: clés de enemy = %v, attendu %v — un champ ajouté ici peut révéler la flotte adverse", label, got, want)
+		t.Errorf("%s: clés de enemy = %v, attendu %v — un champ ajouté ici peut révéler la flotte adverse", label, got, want)
 	}
 
 	// Propriété A : aucune case non tirée ne peut apparaître côté adverse.
+	// Indépendante de B (voir commentaire ci-dessus) : elle s'exécute même si
+	// B vient d'échouer, sur les clés RÉELLEMENT présentes dans enemy — un
+	// champ en plus ne l'empêche pas de trouver les cases qu'il contient.
 	for _, c := range bsCollectCells(enemy) {
 		if !fired[c] {
-			t.Fatalf("%s: la case %+v apparaît dans la vue adverse sans avoir été tirée — la flotte adverse fuite", label, c)
+			t.Errorf("%s: la case %+v apparaît dans la vue adverse sans avoir été tirée — la flotte adverse fuite", label, c)
 		}
 	}
 }
