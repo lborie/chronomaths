@@ -427,12 +427,33 @@ func bsFiredCells(t *testing.T, r *Room, idx int) map[bsCell]bool {
 	return fired
 }
 
+// bsAssertKeys verrouille le jeu de clés d'un sous-arbre du snapshot. name le
+// désigne dans le message d'échec.
+//
+// t.Errorf et jamais t.Fatalf : ces verrous de forme doivent pouvoir échouer
+// sans interrompre les audits qui suivent — voir le commentaire de la propriété
+// B dans assertEnemyViewIsClean.
+func bsAssertKeys(t *testing.T, label, name string, obj any, want []string) {
+	t.Helper()
+	if got := bsKeys(t, obj); !reflect.DeepEqual(got, want) {
+		t.Errorf("%s: clés de %s = %v, attendu %v — un champ ajouté ici peut révéler la flotte adverse", label, name, got, want)
+	}
+}
+
 // assertEnemyViewIsClean est le cœur de l'audit de confidentialité.
 func assertEnemyViewIsClean(t *testing.T, label string, state map[string]any, fired map[bsCell]bool) {
 	t.Helper()
 
-	// Propriété B : la forme de la vue adverse est verrouillée. Un champ
-	// ajouté plus tard échoue ici plutôt que de passer inaperçu.
+	// Propriété B : la forme du snapshot est verrouillée sous-arbre par
+	// sous-arbre. Un champ ajouté plus tard échoue ici plutôt que de passer
+	// inaperçu.
+	//
+	// LES TROIS sous-arbres sont verrouillés, pas seulement "enemy" : la
+	// propriété A ne descend que dans "enemy", si bien qu'un champ portant la
+	// flotte adverse ajouté à bsShot ("lastShot") ou à bsSelfView ("you")
+	// n'était surveillé par RIEN — ni par la forme, ni par le contenu — et que
+	// le jeu de clés de la racine ne bougeait pas non plus, ces deux clés y
+	// figurant déjà.
 	//
 	// t.Errorf, PAS t.Fatalf : les propriétés A et B auditent deux fuites
 	// différentes et doivent pouvoir échouer indépendamment l'une de l'autre.
@@ -449,15 +470,30 @@ func assertEnemyViewIsClean(t *testing.T, label string, state map[string]any, fi
 	if !ok {
 		t.Fatalf("%s: clé \"enemy\" absente", label)
 	}
-	want := []string{"hits", "misses", "remaining", "sunkShips"}
-	if got := bsKeys(t, enemy); !reflect.DeepEqual(got, want) {
-		t.Errorf("%s: clés de enemy = %v, attendu %v — un champ ajouté ici peut révéler la flotte adverse", label, got, want)
+	bsAssertKeys(t, label, "enemy", enemy, []string{"hits", "misses", "remaining", "sunkShips"})
+
+	you, ok := state["you"]
+	if !ok {
+		t.Fatalf("%s: clé \"you\" absente", label)
+	}
+	bsAssertKeys(t, label, "you", you, []string{"hits", "misses", "ships"})
+
+	// lastShot vaut null hors bataille (placement, manche neuve) : sa forme ne
+	// se vérifie que lorsqu'il porte un tir. Sa clé, elle, est toujours
+	// présente — c'est le verrou de la racine qui s'en charge.
+	if shot := state["lastShot"]; shot != nil {
+		bsAssertKeys(t, label, "lastShot", shot, []string{"by", "col", "result", "row"})
 	}
 
 	// Propriété A : aucune case non tirée ne peut apparaître côté adverse.
 	// Indépendante de B (voir commentaire ci-dessus) : elle s'exécute même si
 	// B vient d'échouer, sur les clés RÉELLEMENT présentes dans enemy — un
 	// champ en plus ne l'empêche pas de trouver les cases qu'il contient.
+	//
+	// Le balayage ne porte QUE sur "enemy", et c'est structurel : "you" porte
+	// mes propres bateaux intacts et "lastShot" peut porter la case d'un tir
+	// ADVERSE, donc des cases légitimement absentes de fired. Sur ces deux
+	// sous-arbres, seul le verrou de forme ci-dessus peut mordre.
 	for _, c := range bsCollectCells(enemy) {
 		if !fired[c] {
 			t.Errorf("%s: la case %+v apparaît dans la vue adverse sans avoir été tirée — la flotte adverse fuite", label, c)
@@ -495,10 +531,13 @@ func TestBsEnemyViewNeverLeaksIntactCells(t *testing.T) {
 	// trie par octet, et "winner"[3]='n' < "wins"[3]='s' place winner avant
 	// wins. Ordre corrigé pour correspondre au tri réel — un typo dans la
 	// spec, sans lien avec la confidentialité auditée par ce test.
+	//
+	// bsAssertKeys, donc t.Errorf et non t.Fatalf : un verrou de forme qui
+	// interrompt le test masquerait tous les audits de la phase bataille qui
+	// suivent — la même pathologie que celle corrigée entre les propriétés A
+	// et B (voir assertEnemyViewIsClean).
 	wantRoot := []string{"enemy", "lastShot", "over", "phase", "ready", "rematch", "round", "winner", "wins", "you", "yourTurn"}
-	if got := bsKeys(t, rootState); !reflect.DeepEqual(got, wantRoot) {
-		t.Fatalf("clés du snapshot = %v, attendu %v", got, wantRoot)
-	}
+	bsAssertKeys(t, "bsState/racine", "la racine", rootState, wantRoot)
 
 	// Phase bataille : on tire plusieurs fois et on réaudite après chaque tir.
 	s := r.State.(*bsRoom)
