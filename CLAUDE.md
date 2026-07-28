@@ -2,7 +2,7 @@
 
 ## Projet
 
-**Chronomaths** — Application web ludique pour apprendre les 4 opérations : additions, soustractions, multiplications et divisions (CE2).
+**Chronomaths** — Application web ludique pour apprendre les 4 opérations : additions, soustractions, multiplications et divisions (CM1).
 Sessions chronométrées de calcul mental avec feedback visuel immédiat.
 
 ## Stack technique

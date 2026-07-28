@@ -1,6 +1,6 @@
 # 🧮 Chronomaths
 
-Application web ludique pour apprendre les 4 opérations (additions, soustractions, multiplications, divisions), destinée aux élèves de CE2.
+Application web ludique pour apprendre les 4 opérations (additions, soustractions, multiplications, divisions), destinée aux élèves de CM1.
 
 ## Aperçu
 
