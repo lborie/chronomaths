@@ -88,9 +88,15 @@
 .bs-cell-hit  { background: var(--bs-hit); }
 .bs-cell-miss { background: var(--bs-miss); }
 
+/* Visée en box-shadow inset et NON en outline : .bs-cell-target:focus-visible
+   ci-dessus porte déjà un outline, avec une spécificité (0,2,0) supérieure à
+   celle de cette classe (0,1,0) — et la spécificité l'emporte sur l'ordre
+   source. Or dans le flux clavier la MÊME case est visée et focalisée : un
+   outline ici serait toujours perdu, et l'utilisatrice clavier ne pourrait pas
+   distinguer « focalisée » de « focalisée et visée ». Deux propriétés
+   différentes coexistent, les deux indices s'affichent ensemble. */
 .bs-cell-aimed {
-    outline: 3px solid var(--accent);
-    outline-offset: -3px;
+    box-shadow: 0 0 0 3px var(--accent) inset;
 }
 
 .bs-aim {

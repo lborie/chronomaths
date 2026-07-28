@@ -58,6 +58,18 @@ function bsCellSet(cells) {
     return new Set((cells || []).map(bsKeyOf));
 }
 
+// bsShipCellMap indexe les cases de MA flotte par clé, pour retrouver en O(1) le
+// bateau qui occupe une case. Partagé par la grande grille (phase placement) et
+// par la minimap (phase bataille), qui construisaient la même Map par la même
+// boucle.
+function bsShipCellMap(state) {
+    const map = new Map();
+    for (const ship of state.you.ships || []) {
+        for (const c of ship.cells) map.set(bsKeyOf(c), ship);
+    }
+    return map;
+}
+
 // renderBsSnapshot reconstruit TOUTE l'interface depuis l'état complet reçu.
 // C'est ce qui permet aux trois phases de partager un seul chemin de rendu, et
 // ce qui rend l'affichage auto-réparant si un snapshot est perdu.
@@ -103,10 +115,7 @@ function bsBuildGrid(state, placement) {
     frag.appendChild(bsHeaderCell(''));
     for (const letter of BS_COLS) frag.appendChild(bsHeaderCell(letter));
 
-    const myShipCells = new Map();
-    for (const ship of state.you.ships || []) {
-        for (const c of ship.cells) myShipCells.set(bsKeyOf(c), ship);
-    }
+    const myShipCells = bsShipCellMap(state);
     // Mes tirs sur l'adversaire : c'est tout ce que je sais de sa grille.
     const myHits = bsCellSet(state.enemy.hits);
     const myMisses = bsCellSet(state.enemy.misses);
@@ -114,7 +123,7 @@ function bsBuildGrid(state, placement) {
     for (let row = 0; row < BS_SIZE; row++) {
         frag.appendChild(bsHeaderCell(String(row + 1)));
         for (let col = 0; col < BS_SIZE; col++) {
-            const key = row + ',' + col;
+            const key = bsKeyOf({ row, col });
             let cell;
             if (placement) {
                 // Ma flotte : non cliquable, on regarde seulement.
@@ -156,16 +165,13 @@ function bsHeaderCell(text) {
 // juste pour voir les dégâts reçus.
 function bsBuildMinimap(state) {
     const frag = document.createDocumentFragment();
-    const shipCells = new Map();
-    for (const ship of state.you.ships || []) {
-        for (const c of ship.cells) shipCells.set(bsKeyOf(c), ship);
-    }
+    const shipCells = bsShipCellMap(state);
     const hits = bsCellSet(state.you.hits);
     const misses = bsCellSet(state.you.misses);
 
     for (let row = 0; row < BS_SIZE; row++) {
         for (let col = 0; col < BS_SIZE; col++) {
-            const key = row + ',' + col;
+            const key = bsKeyOf({ row, col });
             const cell = document.createElement('div');
             cell.className = 'bs-mini-cell';
             const ship = shipCells.get(key);
@@ -187,16 +193,47 @@ function bsAim(row, col) {
     if (bsCurrentState) renderBsSnapshot(bsCurrentState);
 }
 
-// bsRestoreFocus rend le focus à la case mémorisée après la reconstruction de
-// la grille. L'heuristique « le focus est sur <body> » peut être fausse
-// (chargement de page, focus perdu ailleurs) : on ne restaure donc que si la
-// case existe encore et reste utilisable.
+// bsRestoreFocus rend le focus à la grille après sa reconstruction.
+//
+// bsFocusCell n'est qu'une ANCRE, pas nécessairement une case focalisable : une
+// case tirée reste `disabled` DÉFINITIVEMENT, et pendant le tour adverse la
+// grille entière l'est. Sans repli, l'ancre restait épinglée sur la case qu'on
+// venait de tirer et plus AUCUN rendu ultérieur ne pouvait rendre le focus, y
+// compris au retour de la main — il fallait re-tabuler jusqu'à 64 fois par tour,
+// les écrans inactifs étant en display:none donc non tabulables.
+//
+// Le repli suit l'ORDRE DU DOM depuis l'ancre, donc « là où Tab aurait mené » :
+// cette grille ne s'explore qu'à la tabulation, il n'y a pas de navigation aux
+// flèches, et la case utile après un tir est la suivante de la séquence de
+// tabulation — pas la voisine géométrique du dessous, à huit tabulations de là.
+// Démarrer la boucle SUR l'ancre (i = 0) donne gratuitement « on la garde si
+// elle est encore jouable, sinon on prend la suivante ».
+//
+// Deux gardes complètent le mécanisme :
+//   - aucune case jouable (placement, tour adverse, partie verrouillée) : on
+//     GARDE l'ancre sans rien focaliser, et c'est précisément ce qui ramènera le
+//     focus dans la grille au retour de la main ;
+//   - on ne prend le focus que s'il est sur <body>, sinon on le volerait à
+//     « ← Retour » ou au bouton « 🎯 Feu ! ». L'heuristique peut être fausse
+//     (chargement de page, focus perdu ailleurs), d'où les remises à null de
+//     bsFocusCell à la sortie du plateau et au nettoyage d'écran.
 function bsRestoreFocus() {
     if (!bsFocusCell) return;
-    const sel = `.bs-cell-target[data-row="${bsFocusCell.row}"][data-col="${bsFocusCell.col}"]`;
-    const cell = bsEl.grid.querySelector(sel);
-    if (cell && !cell.disabled && document.activeElement === document.body) {
-        cell.focus();
+    const cells = bsEl.grid.querySelectorAll('.bs-cell-target');
+    if (!cells.length) return; // phase placement : la grille n'a aucun bouton
+
+    // Les 64 boutons sont en ordre ligne par ligne, comme les cases de la
+    // minimap indexées par bsAnimateShot.
+    const start = bsFocusCell.row * BS_SIZE + bsFocusCell.col;
+    for (let i = 0; i < cells.length; i++) {
+        const cell = cells[(start + i) % cells.length];
+        if (cell.disabled) continue;
+        // L'ancre suit la case retenue même quand on ne prend pas le focus :
+        // elle désigne alors toujours une case jouable, prête pour le rendu
+        // suivant.
+        bsFocusCell = { row: Number(cell.dataset.row), col: Number(cell.dataset.col) };
+        if (document.activeElement === document.body) cell.focus();
+        return;
     }
 }
 
