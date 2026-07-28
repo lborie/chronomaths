@@ -1428,6 +1428,72 @@ screenCleanups.multiWaiting = sessionClose;
 screenCleanups.multiRace = sessionClose;
 screenCleanups.multiWin = sessionClose;
 
+// ------------------------------------------------------------
+// Écrans « rejoindre » et « attente », partagés par les jeux en ligne.
+// Chaque jeu fournit son habillage et sa destination de retour.
+// ------------------------------------------------------------
+
+const onlineEl = {
+    joinEmojiLeft: document.getElementById('join-emoji-left'),
+    joinTitle: document.getElementById('join-title'),
+    joinEmojiRight: document.getElementById('join-emoji-right'),
+    joinSubtitle: document.getElementById('join-subtitle'),
+    waitingEmoji: document.getElementById('waiting-emoji'),
+    waitingName: document.getElementById('waiting-name'),
+    waitingStatus: document.getElementById('waiting-status'),
+    btnWaitingCancel: document.getElementById('btn-waiting-cancel')
+};
+
+const onlineFlow = {
+    waitingEmoji: '🚀',
+    back: 'modes',
+    submit: null
+};
+
+function showJoinScreen({ emojiLeft, title, emojiRight, subtitle, waitingEmoji, back, onSubmit }) {
+    onlineEl.joinEmojiLeft.textContent = emojiLeft;
+    onlineEl.joinTitle.textContent = title;
+    onlineEl.joinEmojiRight.textContent = emojiRight;
+    onlineEl.joinSubtitle.textContent = subtitle;
+    onlineFlow.waitingEmoji = waitingEmoji;
+    onlineFlow.back = back;
+    onlineFlow.submit = onSubmit;
+    showScreen('multiJoin');
+    document.getElementById('player-name').focus();
+}
+
+function showWaitingScreen(name) {
+    onlineEl.waitingEmoji.textContent = onlineFlow.waitingEmoji;
+    onlineEl.waitingName.textContent = name;
+    onlineEl.waitingStatus.textContent = 'Connexion...';
+    showScreen('multiWaiting');
+}
+
+function setWaitingStatus(text) {
+    onlineEl.waitingStatus.textContent = text;
+}
+
+// Quitte le parcours en ligne courant : ferme la session et revient à l'écran
+// d'où le jeu a été lancé (Modes pour la course, hub Jeux pour le Puissance 4).
+function leaveOnline() {
+    sessionClose();
+    showScreen(onlineFlow.back);
+}
+
+function submitOnlineName() {
+    const input = document.getElementById('player-name');
+    const name = input.value.trim();
+    if (!name || !onlineFlow.submit) return;
+    onlineFlow.submit(name);
+}
+
+document.getElementById('btn-join').addEventListener('click', submitOnlineName);
+document.getElementById('player-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitOnlineName();
+});
+document.getElementById('btn-back-home').addEventListener('click', leaveOnline);
+onlineEl.btnWaitingCancel.addEventListener('click', leaveOnline);
+
 // ============================================================
 // MULTIPLAYER MODE
 // ============================================================
@@ -1443,10 +1509,7 @@ const multi = {
 
 const multiEl = {
     btnMulti: document.getElementById('btn-multi'),
-    btnBackHome: document.getElementById('btn-back-home'),
     joinForm: document.getElementById('join-form'),
-    playerName: document.getElementById('player-name'),
-    waitingName: document.getElementById('waiting-name'),
     player1Name: document.getElementById('player1-name'),
     player2Name: document.getElementById('player2-name'),
     player1Score: document.getElementById('player1-score'),
@@ -1470,28 +1533,23 @@ const multiEl = {
 };
 
 multiEl.btnMulti.addEventListener('click', () => {
-    showScreen('multiJoin');
-    multiEl.playerName.focus();
+    showJoinScreen({
+        emojiLeft: '🎮',
+        title: 'Multi Joueur',
+        emojiRight: '🚀',
+        subtitle: 'Course de fusées !',
+        waitingEmoji: '🚀',
+        back: 'modes',
+        onSubmit: joinRace
+    });
 });
 
-multiEl.btnBackHome.addEventListener('click', () => {
-    sessionClose();
-    showScreen('modes');
-});
-
-const waitingStatusEl = document.getElementById('waiting-status');
-
-function joinGame() {
-    const name = multiEl.playerName.value.trim();
-    if (!name) return;
-
+function joinRace(name) {
     multi.playerName = name;
     multi.myScore = 0;
     multi.opponentScore = 0;
 
-    multiEl.waitingName.textContent = name;
-    waitingStatusEl.textContent = 'Connexion...';
-    showScreen('multiWaiting');
+    showWaitingScreen(name);
 
     sessionJoin({
         game: 'race',
@@ -1499,8 +1557,8 @@ function joinGame() {
         name,
         on: {
             waiting: () => {
-                multiEl.waitingName.textContent = multi.playerName;
-                waitingStatusEl.textContent = '';
+                onlineEl.waitingName.textContent = multi.playerName;
+                setWaitingStatus('');
                 showScreen('multiWaiting');
             },
             start: (msg) => {
@@ -1524,16 +1582,9 @@ function joinGame() {
         onLost: () => {
             if (getActiveScreen() === 'multiRace') showOpponentLeft();
         },
-        onError: () => {
-            waitingStatusEl.textContent = 'Erreur de connexion';
-        }
+        onError: () => setWaitingStatus('Erreur de connexion')
     });
 }
-
-document.getElementById('btn-join').addEventListener('click', joinGame);
-multiEl.playerName.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') joinGame();
-});
 
 function startMultiRace(msg) {
     multiEl.player1Name.textContent = multi.playerName;

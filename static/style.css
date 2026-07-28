@@ -878,6 +878,11 @@ body::after {
     background: var(--accent);
 }
 
+.waiting-card .back-btn {
+    margin-top: 1.25rem;
+    min-height: 44px;
+}
+
 @keyframes dotPulse {
     0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
     40% { transform: scale(1); opacity: 1; }
