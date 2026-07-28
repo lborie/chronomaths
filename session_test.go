@@ -180,28 +180,51 @@ func TestJoinDoesNotMixQueues(t *testing.T) {
 	expectNoEvent(t, p0)
 }
 
-func TestRaceScoring(t *testing.T) {
-	resetHub()
-	p0, _, _ := join("race", "addition", "Ludo")
-	expectEvent(t, p0, "waiting")
-	p1, r, _ := join("race", "addition", "Léa")
+// --- Course de fusées ---
 
-	var start struct {
-		Question Question `json:"question"`
+// joinRace apparie deux joueurs sur une course d'additions et consomme
+// l'event "waiting". Les events "start" restent à lire par l'appelant.
+func joinRace(t *testing.T) (*Player, *Player, *Room) {
+	t.Helper()
+	resetHub()
+	p0, _, err := join("race", "addition", "Ludo")
+	if err != nil {
+		t.Fatal(err)
 	}
-	json.Unmarshal(expectEvent(t, p0, "start"), &start)
+	expectEvent(t, p0, "waiting")
+	p1, r, err := join("race", "addition", "Léa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p0, p1, r
+}
+
+// raceAnswer lit la réponse attendue dans l'état serveur du joueur. Les tests
+// ne peuvent plus la prendre dans le flux SSE — c'était précisément la fuite
+// que Question.Answer `json:"-"` supprime. À relire avant chaque coup :
+// raceGame.Action remplace la question au passage.
+func raceAnswer(t *testing.T, p *Player) int {
+	t.Helper()
+	st, ok := p.State.(*raceState)
+	if !ok {
+		t.Fatalf("état de %s absent ou d'un autre jeu: %T", p.Name, p.State)
+	}
+	return st.Question.Answer
+}
+
+func TestRaceScoring(t *testing.T) {
+	p0, p1, r := joinRace(t)
+	expectEvent(t, p0, "start")
 	expectEvent(t, p1, "start")
 
 	// Quatre bonnes réponses : +1 à chaque fois, notification à l'adversaire.
-	answer := start.Question.Answer
 	var upd struct {
-		YourScore     int      `json:"yourScore"`
-		OpponentScore int      `json:"opponentScore"`
-		Correct       bool     `json:"correct"`
-		Question      Question `json:"question"`
+		YourScore     int  `json:"yourScore"`
+		OpponentScore int  `json:"opponentScore"`
+		Correct       bool `json:"correct"`
 	}
 	for i := 1; i <= 4; i++ {
-		act(t, r, p0, map[string]int{"answer": answer})
+		act(t, r, p0, map[string]int{"answer": raceAnswer(t, p0)})
 		json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
 		if !upd.Correct || upd.YourScore != i || upd.OpponentScore != 0 {
 			t.Fatalf("après %d bonne(s) réponse(s), scoreUpdate = %+v", i, upd)
@@ -213,13 +236,12 @@ func TestRaceScoring(t *testing.T) {
 		if opp.OpponentScore != i {
 			t.Fatalf("opponentScore = %d, attendu %d", opp.OpponentScore, i)
 		}
-		answer = upd.Question.Answer
 	}
 
 	// Mauvaise réponse depuis un score de 4 : 4 - 3 = 1 pile, ce qui pin
 	// la valeur exacte de penaltyPoints (un plancher à 0 masquerait toute
 	// valeur de pénalité >= 4).
-	act(t, r, p0, map[string]int{"answer": answer + 1})
+	act(t, r, p0, map[string]int{"answer": raceAnswer(t, p0) + 1})
 	json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
 	if upd.Correct || upd.YourScore != 1 {
 		t.Fatalf("pénalité incorrecte, attendu 4-3=1: %+v", upd)
@@ -227,27 +249,52 @@ func TestRaceScoring(t *testing.T) {
 	expectEvent(t, p1, "opponentScore")
 }
 
-func TestRaceWinAtTwenty(t *testing.T) {
-	resetHub()
-	p0, _, _ := join("race", "addition", "Ludo")
-	expectEvent(t, p0, "waiting")
-	p1, r, _ := join("race", "addition", "Léa")
-
-	var start struct {
-		Question Question `json:"question"`
-	}
-	json.Unmarshal(expectEvent(t, p0, "start"), &start)
+// TestRaceScoreFloorsAtZero couvre le plancher, que TestRaceScoring laisse
+// volontairement de côté : son cas 4-3=1 est choisi pour pin penaltyPoints,
+// donc il ne passe jamais sous zéro.
+func TestRaceScoreFloorsAtZero(t *testing.T) {
+	p0, p1, r := joinRace(t)
+	expectEvent(t, p0, "start")
 	expectEvent(t, p1, "start")
 
-	answer := start.Question.Answer
-	for i := 0; i < 20; i++ {
+	var upd struct {
+		YourScore int  `json:"yourScore"`
+		Correct   bool `json:"correct"`
+	}
+	play := func(answer int) {
+		t.Helper()
 		act(t, r, p0, map[string]int{"answer": answer})
-		var upd struct {
-			Question Question `json:"question"`
-		}
 		json.Unmarshal(expectEvent(t, p0, "scoreUpdate"), &upd)
 		expectEvent(t, p1, "opponentScore")
-		answer = upd.Question.Answer
+	}
+
+	// Un point d'abord : la pénalité doit alors produire 1 - 3 = -2, donc un
+	// intermédiaire réellement négatif. Repartir de 0 ne distinguerait pas un
+	// plancher d'un score qui n'a simplement jamais bougé.
+	play(raceAnswer(t, p0))
+	if !upd.Correct || upd.YourScore != 1 {
+		t.Fatalf("bonne réponse initiale: scoreUpdate = %+v, attendu score 1", upd)
+	}
+	play(raceAnswer(t, p0) + 1)
+	if upd.Correct || upd.YourScore != 0 {
+		t.Fatalf("plancher manquant, 1-3 doit donner 0: scoreUpdate = %+v", upd)
+	}
+	// Et le score reste à 0, il ne descend pas en négatif par accumulation.
+	play(raceAnswer(t, p0) + 1)
+	if upd.Correct || upd.YourScore != 0 {
+		t.Fatalf("mauvaise réponse depuis 0: scoreUpdate = %+v, attendu score 0", upd)
+	}
+}
+
+func TestRaceWinAtTwenty(t *testing.T) {
+	p0, p1, r := joinRace(t)
+	expectEvent(t, p0, "start")
+	expectEvent(t, p1, "start")
+
+	for i := 0; i < 20; i++ {
+		act(t, r, p0, map[string]int{"answer": raceAnswer(t, p0)})
+		expectEvent(t, p0, "scoreUpdate")
+		expectEvent(t, p1, "opponentScore")
 	}
 
 	var win struct{ Winner string }
@@ -261,23 +308,84 @@ func TestRaceWinAtTwenty(t *testing.T) {
 	}
 }
 
+// questionObject décode les octets réellement envoyés sur le fil et retourne
+// l'objet racine et son objet "question". Passer par une map plutôt que par
+// les structs Go est ce qui rend le test insensible au type de transport :
+// il verrait aussi une fuite réintroduite par une struct dédiée.
+func questionObject(t *testing.T, raw []byte) (map[string]any, map[string]any) {
+	t.Helper()
+	var root map[string]any
+	if err := json.Unmarshal(raw, &root); err != nil {
+		t.Fatalf("JSON illisible: %v (data=%s)", err, raw)
+	}
+	q, ok := root["question"].(map[string]any)
+	if !ok {
+		t.Fatalf("clé \"question\" absente ou non-objet dans %s", raw)
+	}
+	return root, q
+}
+
+// assertQuestionHidesAnswer vérifie qu'un objet "question" du fil cache la
+// réponse mais expose bien les opérandes.
+func assertQuestionHidesAnswer(t *testing.T, event string, q map[string]any) {
+	t.Helper()
+	// Inspection par clé, jamais par sous-chaîne : "correctAnswer" — légitime
+	// à la racine de scoreUpdate — contient "answer" en camelCase.
+	if _, leaked := q["answer"]; leaked {
+		t.Fatalf("%s: la réponse fuite dans question %v, un joueur lisant son flux SSE gagnerait à coup sûr", event, q)
+	}
+	for _, key := range []string{"a", "b"} {
+		if _, ok := q[key]; !ok {
+			t.Fatalf("%s: clé %q absente de question %v, le front n'affiche plus le calcul", event, key, q)
+		}
+	}
+}
+
+// TestRaceStartHidesAnswer échoue si Question.Answer redevient sérialisable :
+// l'event "start" porte la question avant toute réponse du joueur.
+func TestRaceStartHidesAnswer(t *testing.T) {
+	p0, p1, _ := joinRace(t)
+	_, q := questionObject(t, expectEvent(t, p0, "start"))
+	assertQuestionHidesAnswer(t, "start", q)
+	_, q = questionObject(t, expectEvent(t, p1, "start"))
+	assertQuestionHidesAnswer(t, "start", q)
+}
+
+// TestRaceScoreUpdateHidesAnswerButRevealsCorrectAnswer couvre l'autre event
+// porteur d'une question — celle du coup suivant, donc encore à trouver — et
+// pin la présence de correctAnswer, qui révèle légitimement la réponse au
+// coup déjà joué (le front en a besoin pour « La réponse était X »).
+func TestRaceScoreUpdateHidesAnswerButRevealsCorrectAnswer(t *testing.T) {
+	p0, p1, r := joinRace(t)
+	expectEvent(t, p0, "start")
+	expectEvent(t, p1, "start")
+
+	want := raceAnswer(t, p0)
+	act(t, r, p0, map[string]int{"answer": want + 1})
+
+	root, q := questionObject(t, expectEvent(t, p0, "scoreUpdate"))
+	assertQuestionHidesAnswer(t, "scoreUpdate", q)
+
+	got, ok := root["correctAnswer"]
+	if !ok {
+		t.Fatalf("clé \"correctAnswer\" absente de scoreUpdate %v: le front ne peut plus afficher « La réponse était X »", root)
+	}
+	if n, isNum := got.(float64); !isNum || int(n) != want {
+		t.Fatalf("correctAnswer = %v, attendu %d", got, want)
+	}
+	expectEvent(t, p1, "opponentScore")
+}
+
 // TestHandleActionHTTPRoutesThroughGame vérifie que le handler HTTP réel
 // (pas seulement act(), qui reproduit son verrouillage) déclenche bien
 // room.Game.Action() sous room.mu : c'est la discipline de verrouillage
 // que ce refactor a pour but d'établir.
 func TestHandleActionHTTPRoutesThroughGame(t *testing.T) {
-	resetHub()
-	p0, _, _ := join("race", "addition", "Ludo")
-	expectEvent(t, p0, "waiting")
-	p1, _, _ := join("race", "addition", "Léa")
-
-	var start struct {
-		Question Question `json:"question"`
-	}
-	json.Unmarshal(expectEvent(t, p0, "start"), &start)
+	p0, p1, _ := joinRace(t)
+	expectEvent(t, p0, "start")
 	expectEvent(t, p1, "start")
 
-	body, _ := json.Marshal(map[string]int{"answer": start.Question.Answer})
+	body, _ := json.Marshal(map[string]int{"answer": raceAnswer(t, p0)})
 	req := httptest.NewRequest(http.MethodPost, "/api/action", strings.NewReader(string(body)))
 	req.Header.Set("X-Player-ID", p0.ID)
 	rec := httptest.NewRecorder()
