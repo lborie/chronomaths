@@ -305,8 +305,8 @@ func TestHandleActionHTTPRoutesThroughGame(t *testing.T) {
 func TestHandleJoinHTTPRejectsInvalidRequests(t *testing.T) {
 	resetHub()
 	cases := []string{
-		`{"game":"connect4","name":"X"}`, // jeu inconnu (pas encore enregistré)
-		`{"game":"race","name":"X"}`,     // opération manquante
+		`{"game":"tic-tac-toe","name":"X"}`, // jeu inconnu
+		`{"game":"race","name":"X"}`,        // opération manquante
 	}
 	for _, body := range cases {
 		req := httptest.NewRequest(http.MethodPost, "/api/join", strings.NewReader(body))

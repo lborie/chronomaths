@@ -181,10 +181,12 @@ func join(gameName, variant, name string) (*Player, *Room, error) {
 
 	log.Printf("[JOIN] %s rejoint la room de %s (%s)", p.Name, room.Players[0].Name, key)
 
-	room.mu.Lock()
-	room.started = true
-	room.Game.Start(room)
-	room.mu.Unlock()
+	func() {
+		room.mu.Lock()
+		defer room.mu.Unlock()
+		room.started = true
+		room.Game.Start(room)
+	}()
 
 	return p, room, nil
 }
