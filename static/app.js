@@ -299,15 +299,6 @@ function cleanupScreen(screenName) {
         case 'game':
             clearInterval(state.timerInterval);
             break;
-        case 'multiWaiting':
-        case 'multiRace':
-        case 'multiWin':
-            if (multi.eventSource) {
-                multi.eventSource.close();
-                multi.eventSource = null;
-            }
-            multi.playerId = null;
-            break;
     }
 }
 
@@ -1354,14 +1345,96 @@ poseeEl.btnReplay.addEventListener('click', () => {
 });
 
 // ============================================================
+// SESSION EN LIGNE (générique : course de fusées, Puissance 4)
+// ============================================================
+
+const session = {
+    eventSource: null,
+    playerId: null,
+    name: ''
+};
+
+// Ouvre une session : POST /api/join puis branchement du flux SSE.
+//   on      : table { nom d'event SSE -> handler(data) }
+//   onLost  : appelé si le flux se ferme de façon inattendue
+//   onError : appelé si le join échoue
+// Retourne true si la session est ouverte.
+async function sessionJoin({ game, operation, name, on, onLost, onError }) {
+    sessionClose();
+    session.name = name;
+
+    let playerId;
+    try {
+        const res = await fetch('/api/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ game, name, operation })
+        });
+        if (!res.ok) {
+            if (onError) onError();
+            return false;
+        }
+        playerId = (await res.json()).playerId;
+    } catch (err) {
+        if (onError) onError();
+        return false;
+    }
+
+    session.playerId = playerId;
+
+    const es = new EventSource(`/api/events?playerId=${encodeURIComponent(playerId)}`);
+    session.eventSource = es;
+
+    Object.entries(on).forEach(([event, handler]) => {
+        es.addEventListener(event, (e) => handler(e.data ? JSON.parse(e.data) : {}));
+    });
+
+    es.onerror = () => {
+        if (es.readyState === EventSource.CLOSED) {
+            session.eventSource = null;
+            session.playerId = null;
+            if (onLost) onLost();
+        }
+    };
+
+    return true;
+}
+
+// Envoie un coup au serveur. Le format est propre à chaque jeu.
+function sessionSend(payload) {
+    if (!session.playerId) return;
+    fetch('/api/action', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Player-ID': session.playerId
+        },
+        body: JSON.stringify(payload)
+    });
+}
+
+// Ferme la session. Sans effet si aucune session n'est ouverte.
+function sessionClose() {
+    if (session.eventSource) {
+        session.eventSource.close();
+        session.eventSource = null;
+    }
+    session.playerId = null;
+}
+
+// Les écrans en ligne ferment la session quand on les quitte (y compris via
+// la navigation arrière du navigateur).
+screenCleanups.multiWaiting = sessionClose;
+screenCleanups.multiRace = sessionClose;
+screenCleanups.multiWin = sessionClose;
+
+// ============================================================
 // MULTIPLAYER MODE
 // ============================================================
 
 const WIN_SCORE = 20;
 
 const multi = {
-    eventSource: null,
-    playerId: null,
     playerName: '',
     opponentName: '',
     myScore: 0,
@@ -1402,13 +1475,11 @@ multiEl.btnMulti.addEventListener('click', () => {
 });
 
 multiEl.btnBackHome.addEventListener('click', () => {
-    if (multi.eventSource) {
-        multi.eventSource.close();
-        multi.eventSource = null;
-    }
-    multi.playerId = null;
+    sessionClose();
     showScreen('modes');
 });
+
+const waitingStatusEl = document.getElementById('waiting-status');
 
 function joinGame() {
     const name = multiEl.playerName.value.trim();
@@ -1418,94 +1489,51 @@ function joinGame() {
     multi.myScore = 0;
     multi.opponentScore = 0;
 
-    connectSSE(name);
+    multiEl.waitingName.textContent = name;
+    waitingStatusEl.textContent = 'Connexion...';
+    showScreen('multiWaiting');
+
+    sessionJoin({
+        game: 'race',
+        operation: config.operation,
+        name,
+        on: {
+            waiting: () => {
+                multiEl.waitingName.textContent = multi.playerName;
+                waitingStatusEl.textContent = '';
+                showScreen('multiWaiting');
+            },
+            start: (msg) => {
+                multi.opponentName = msg.opponent;
+                multi.myScore = 0;
+                multi.opponentScore = 0;
+                startMultiRace(msg);
+            },
+            scoreUpdate: (msg) => {
+                multi.myScore = msg.yourScore;
+                multi.opponentScore = msg.opponentScore;
+                handleScoreUpdate(msg);
+            },
+            opponentScore: (msg) => {
+                multi.opponentScore = msg.opponentScore;
+                updateRaceTrack();
+            },
+            win: (msg) => showWinScreen(msg.winner),
+            opponentLeft: () => showOpponentLeft()
+        },
+        onLost: () => {
+            if (getActiveScreen() === 'multiRace') showOpponentLeft();
+        },
+        onError: () => {
+            waitingStatusEl.textContent = 'Erreur de connexion';
+        }
+    });
 }
 
 document.getElementById('btn-join').addEventListener('click', joinGame);
 multiEl.playerName.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') joinGame();
 });
-
-const waitingStatusEl = document.getElementById('waiting-status');
-
-async function connectSSE(name) {
-    if (multi.eventSource) {
-        multi.eventSource.close();
-        multi.eventSource = null;
-    }
-
-    multiEl.waitingName.textContent = name;
-    waitingStatusEl.textContent = 'Connexion...';
-    showScreen('multiWaiting');
-
-    try {
-        const res = await fetch('/api/join', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ game: 'race', name, operation: config.operation })
-        });
-
-        if (!res.ok) {
-            waitingStatusEl.textContent = 'Erreur de connexion';
-            return;
-        }
-
-        const { playerId } = await res.json();
-        multi.playerId = playerId;
-
-        const es = new EventSource(`/api/events?playerId=${playerId}`);
-        multi.eventSource = es;
-
-        es.addEventListener('waiting', (e) => {
-            multiEl.waitingName.textContent = multi.playerName;
-            waitingStatusEl.textContent = '';
-            showScreen('multiWaiting');
-        });
-
-        es.addEventListener('start', (e) => {
-            const msg = JSON.parse(e.data);
-            multi.opponentName = msg.opponent;
-            multi.myScore = 0;
-            multi.opponentScore = 0;
-            startMultiRace(msg);
-        });
-
-        es.addEventListener('scoreUpdate', (e) => {
-            const msg = JSON.parse(e.data);
-            multi.myScore = msg.yourScore;
-            multi.opponentScore = msg.opponentScore;
-            handleScoreUpdate(msg);
-        });
-
-        es.addEventListener('opponentScore', (e) => {
-            const msg = JSON.parse(e.data);
-            multi.opponentScore = msg.opponentScore;
-            updateRaceTrack();
-        });
-
-        es.addEventListener('win', (e) => {
-            const msg = JSON.parse(e.data);
-            showWinScreen(msg.winner);
-        });
-
-        es.addEventListener('opponentLeft', () => {
-            showOpponentLeft();
-        });
-
-        es.onerror = () => {
-            if (es.readyState === EventSource.CLOSED) {
-                multi.eventSource = null;
-                multi.playerId = null;
-                const screen = getActiveScreen();
-                if (screen === 'multiRace') {
-                    showOpponentLeft();
-                }
-            }
-        };
-    } catch (err) {
-        waitingStatusEl.textContent = 'Erreur de connexion';
-    }
-}
 
 function startMultiRace(msg) {
     multiEl.player1Name.textContent = multi.playerName;
@@ -1614,23 +1642,11 @@ function showOpponentLeft() {
 multiEl.multiAnswerForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const answer = parseInt(multiEl.multiAnswerInput.value);
-    if (isNaN(answer) || !multi.playerId) return;
-
-    fetch('/api/action', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Player-ID': multi.playerId
-        },
-        body: JSON.stringify({ answer })
-    });
+    if (isNaN(answer)) return;
+    sessionSend({ answer });
 });
 
 multiEl.btnPlayAgainMulti.addEventListener('click', () => {
-    if (multi.eventSource) {
-        multi.eventSource.close();
-        multi.eventSource = null;
-    }
-    multi.playerId = null;
+    sessionClose();
     showScreen('modes');
 });
