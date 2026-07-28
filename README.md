@@ -54,6 +54,18 @@ Si un joueur quitte la partie, l'autre est prévenu et peut revenir au hub Jeux.
 
 Aucun calcul n'est demandé : c'est une récompense entre deux séries d'entraînement.
 
+#### Bataille navale en ligne
+
+2 joueuses, chacune sur son écran. Le jeu n'existe qu'en ligne : chacune doit pouvoir cacher sa flotte à l'autre.
+
+- Chaque joueuse saisit son prénom, la première arrivée attend une adversaire.
+- Le serveur place les 4 bateaux au hasard — **Porte-avions** (4 cases), **Croiseur** (3), **Sous-marin** (3), **Torpilleur** (2). Le bouton **« 🎲 Mélanger »** retire une flotte autant de fois qu'on veut, puis **« ✓ Je suis prête »** la verrouille. La bataille commence quand les deux sont prêtes.
+- On tape une case de la grille adverse, elle se met en surbrillance avec ses coordonnées, et le bouton **« 🎯 Feu ! »** tire. Cette confirmation évite qu'un doigt qui glisse gâche un tour.
+- **Touché → on rejoue.** Dans l'eau → la main passe. Quand un bateau est coulé, son nom est annoncé.
+- La première à couler les 4 bateaux adverses gagne. Le score de manches est conservé, et **les deux joueuses doivent cliquer sur « Nouvelle manche »** pour relancer ; la joueuse qui commence alterne.
+
+Aucun calcul n'est demandé : c'est une récompense entre deux séries d'entraînement.
+
 ### Écran de résultats
 
 - ✅ Nombre de bonnes réponses
@@ -109,6 +121,8 @@ chronomaths/
 ├── race.go              # Course de fusées : génération des questions + jeu
 ├── connect4.go          # Puissance 4 : logique pure + jeu en ligne
 ├── connect4_test.go     # Tests de la logique de plateau et du jeu en ligne
+├── battleship.go        # Bataille navale : logique pure + jeu en ligne
+├── battleship_test.go   # Tests du plateau, du jeu en ligne et de la confidentialité
 ├── go.mod               # Module Go
 ├── README.md
 └── static/
@@ -117,6 +131,8 @@ chronomaths/
     ├── games.css        # Styles du hub Jeux et du Puissance 4
     ├── app.js           # Logique JavaScript
     ├── games.js         # Section Jeux : logique pure + rendu du Puissance 4
+    ├── battleship.js    # Bataille navale en ligne : rendu par snapshot
+    ├── battleship.css   # Styles des grilles de la bataille navale
     ├── manifest.json    # Web App Manifest (PWA)
     ├── sw.js            # Service Worker
     └── icon.svg         # Icône application
@@ -133,7 +149,7 @@ Le serveur gère les fichiers statiques et les jeux à deux joueurs via SSE (Ser
 - Zéro dépendance externe (standard library uniquement)
 - Port par défaut : 8080
 
-`session.go` porte le matchmaking et le flux SSE sans connaître aucune règle de jeu : il délègue aux jeux, qui s'y enregistrent chacun de leur côté. Deux jeux l'utilisent aujourd'hui : la **course de fusées** (`race.go`, une file d'attente par opération) et le **Puissance 4 en ligne** (`connect4.go`, une seule file). Pour le Puissance 4, le plateau qui fait foi est celui du serveur : le client envoie la colonne jouée et n'affiche que l'état complet renvoyé, ce qui rend impossible de jouer hors de son tour depuis un client modifié.
+`session.go` porte le matchmaking et le flux SSE sans connaître aucune règle de jeu : il délègue aux jeux, qui s'y enregistrent chacun de leur côté. Trois jeux l'utilisent aujourd'hui : la **course de fusées** (`race.go`, une file d'attente par opération), le **Puissance 4 en ligne** (`connect4.go`, une seule file) et la **bataille navale en ligne** (`battleship.go`, une seule file). Pour le Puissance 4, le plateau qui fait foi est celui du serveur : le client envoie la colonne jouée et n'affiche que l'état complet renvoyé, ce qui rend impossible de jouer hors de son tour depuis un client modifié. La bataille navale va plus loin : le serveur place la flotte au hasard et n'envoie à chaque joueuse qu'une **vue partielle** de l'état — la sienne au complet, celle de l'adversaire réduite aux tirs déjà joués — ce qui rend la flotte adverse invisible même en lisant le flux SSE brut.
 
 ```go
 //go:embed static/*
@@ -151,6 +167,8 @@ var staticFiles embed.FS
 | `games.css` | Styles du hub Jeux et du plateau Puissance 4 |
 | `app.js` | Machine à états, génération questions (+, −, ×, ÷), timer |
 | `games.js` | Puissance 4 : logique pure (sans DOM), rendu et interactions, mode en ligne |
+| `battleship.js` | Bataille navale en ligne : rendu par snapshot, interactions |
+| `battleship.css` | Styles des grilles de la bataille navale |
 
 `games.css` et `games.js` sont chargés **après** `style.css` et `app.js` : ce sont des scripts classiques, et `games.js` résout `screens`, `showScreen` et `screenCleanups` par portée lexicale globale.
 

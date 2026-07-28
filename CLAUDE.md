@@ -21,6 +21,8 @@ chronomaths/
 ├── race.go           # Course de fusées : génération des questions + jeu
 ├── connect4.go       # Puissance 4 : logique pure + jeu en ligne
 ├── connect4_test.go  # Tests de la logique de plateau et du jeu en ligne
+├── battleship.go     # Bataille navale : logique pure + jeu en ligne
+├── battleship_test.go # Tests du plateau, du jeu en ligne et de la confidentialité
 ├── go.mod            # Module Go (aucune dépendance externe)
 ├── README.md         # Documentation utilisateur (FR)
 ├── CLAUDE.md         # Ce fichier
@@ -30,6 +32,8 @@ chronomaths/
     ├── games.css     # Styles du hub Jeux et du plateau Puissance 4
     ├── app.js        # Machine à états, génération questions (+, −, ×, ÷), timer
     ├── games.js      # Section Jeux : logique pure + rendu du Puissance 4
+    ├── battleship.js  # Bataille navale en ligne : rendu par snapshot
+    ├── battleship.css # Styles des grilles de la bataille navale
     ├── manifest.json # Web App Manifest (PWA)
     ├── sw.js         # Service Worker (cache offline)
     └── icon.svg      # Icône PWA
@@ -88,6 +92,7 @@ Accueil ──┬─ (+, −, × ou ÷) → Modes (Sprint/Course/Marathon/Posée
 - **Front** : `sessionJoin({game, operation, name, on, onLost, onError})`, `sessionSend(payload)` et `sessionClose()` vivent dans `app.js` (pas de fichier séparé : cela imposerait une entrée de plus dans le precache de `sw.js` et une contrainte d'ordre de chargement supplémentaire). `on` est une table `nom d'event → handler`.
 - Les écrans `screen-multi-join` et `screen-multi-waiting` sont **partagés** par les jeux en ligne : `showJoinScreen({emojiLeft, title, emojiRight, subtitle, waitingEmoji, waitingTilt, back, onSubmit})` en fournit l'habillage et la destination de retour.
 - L'écran d'attente flotte son emoji sans rotation (`.waiting-icon`) ; seule la course de fusées ajoute l'inclinaison à −45° façon vol de fusée, via la classe `.waiting-icon.waiting-rocket` posée quand `waitingTilt` est vrai. Ne jamais remonter cette rotation sur la classe de base : elle inclinerait l'emoji de tout futur jeu en ligne.
+- ⚠️ **La bataille navale a de l'état caché**, contrairement au Puissance 4 dont le plateau est public. Son état de jeu part par `sendEvent(p, …)` avec une **vue par joueuse**, jamais par `broadcast`. La confidentialité est portée par le **typage** : `bsEnemyView` n'a aucun champ capable de contenir une case de bateau non touchée, donc réintroduire la fuite exigerait d'y ajouter un champ. C'est la leçon de `Question.Answer` dans `race.go`, où `json:"-"` fermait la fuite mais demandait de s'en souvenir. Un test de confidentialité parcourt récursivement le payload émis et échoue si une case non touchée de la flotte adverse y apparaît.
 
 ### Section Jeux
 
@@ -104,6 +109,20 @@ Accueil ──┬─ (+, −, × ou ÷) → Modes (Sprint/Course/Marathon/Posée
 - `c4StateMsg` (connect4.go) reflète les champs de `c4Room` à la main dans `snapshot()` : toute nouvelle propriété de `c4Room` doit y être reportée explicitement, sinon elle n'atteint jamais le client (voir le commentaire sur `snapshot()`).
 - **Cible tactile des colonnes** : les 44 px de large ne sont pas atteignables sous ~382 px de viewport — 7 colonnes à 44 px réclament 308 px, or un écran de 320 px n'offre que 288 px utiles hors safe-area. Le bloc `@media (max-width: 480px)` de `games.css` rend au plateau les pixels des paddings horizontaux (mesuré : ~35 px à 320 px, 43 px à 375 px, 45 px à 390 px). Ne pas descendre le `gap` sous 3 px pour gagner ces derniers pixels : la grille cesse de se lire comme un Puissance 4, et la colonne fait déjà 263 px de haut sans zone morte. En paysage court (`max-height: 500px`), le plateau n'est **pas** borné par la hauteur : l'y contraindre imposerait des colonnes d'environ 28 px. La page défile donc verticalement en paysage, jamais horizontalement.
 - Toute modification de `static/` doit s'accompagner d'un bump de `CACHE_NAME` dans `sw.js` : le Service Worker sert en cache-first, sinon la PWA continue de livrer l'ancienne version.
+
+### Bataille navale
+
+- `static/battleship.js` et `static/battleship.css` sont des fichiers **dédiés**, chargés après `app.js` dont ils résolvent les helpers par portée globale. Ils ajoutent deux entrées au precache de `sw.js` — c'est le coût assumé de ne pas gonfler `games.js`, qui atteignait déjà 509 lignes.
+- Trois phases sur un seul écran `screen-battleship`, pilotées par `state.phase` (`placement` | `battle` | `over`). `renderBsSnapshot(state)` reconstruit tout depuis l'état complet.
+- Le placement est **aléatoire côté serveur** : le serveur n'accepte jamais une flotte venue du client, ce qui supprime toute validation de placement triché.
+- Les cases non jouables sont `disabled` : le verrou est porté par le DOM, sans drapeau de lock. Une case déjà tirée l'est aussi.
+- `bsFocusCell` est en portée module, pour la même raison que `c4FocusCol` : la grille est entièrement reconstruite à chaque rendu.
+- Un snapshot n'est animé que si les coordonnées de `lastShot` ont changé depuis le précédent rendu. Ni le nom de l'event (la revanche rediffuse le même `lastShot`) ni `Round` (il s'incrémente sur le snapshot qui ne doit pas s'animer) ne sont des discriminants valides.
+- **Cases de ~37 px sur téléphone.** Les 44 px sont hors d'atteinte pour 8 colonnes : 352 px de cases + 21 de gaps + 24 de paddings = 397 px utiles, soit un écran de 429 px. La réponse retenue est **« viser puis confirmer »** — un tap sélectionne, le bouton « 🎯 Feu ! » de 44 px tire — et non un rétrécissement de la grille. À réévaluer si le geste s'avère pénible à l'usage.
+- `bsStateMsg` reflète `bsRoom` à la main : tout nouveau champ doit y être reporté, et un champ ajouté à la légère peut révéler la flotte adverse.
+- ⚠️ `#bs-rematch-status` porte **deux usages** : le statut d'attente de revanche/placement et l'annonce du bateau coulé. Le message d'attente est **prioritaire** sur l'annonce — `bsUpdateRematch` écrit toujours ce champ en premier (message d'attente ou chaîne vide), et `bsAnnounceSunk` ne pose son annonce que si le créneau est resté vide. C'est aussi ce qui efface l'annonce au tir suivant : `bsUpdateRematch` aura déjà réinitialisé le champ avant le nouvel appel.
+- L'annonce « je coule un bateau adverse » se détermine en **comparant `enemy.sunkShips` au snapshot précédent** pour trouver le nom nouvellement apparu — jamais en prenant le dernier élément du tableau, qui suit l'ordre de `bsFleetSpec` et non l'ordre chronologique des coulages. C'est le seul endroit du jeu qui dépende d'un **delta** entre deux snapshots, alors que la règle du dépôt est « état absolu, jamais un delta » : une perte de message peut donc avaler une annonce, jamais en produire une fausse. Le sens inverse, « mon bateau coule », s'apparie par coordonnées avec `lastShot` et échappe à cette limite.
+- `applyBsState` replie `state.yourTurn` avec `!bsOnline.lost`, et la ligne de statut affiche `bsOnline.lost` en priorité : sans cela, un `bsState` arrivant après `opponentLeft` réactiverait la grille verrouillée et effacerait le message de déconnexion. Le Puissance 4 porte la même garde dans `applyC4State`.
 
 ## Conventions
 
