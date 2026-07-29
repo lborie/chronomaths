@@ -35,6 +35,18 @@
     margin-bottom: 0.75rem;
 }
 
+/* Libellé de la grande grille : « Ta flotte » en placement, « Flotte adverse »
+   en bataille. Mêmes proportions que .bs-minimap-title, les deux grilles
+   portant chacune son compteur. */
+.bs-grid-title {
+    display: block;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+}
+
 /* 9 colonnes : la gouttière des numéros de ligne, puis les 8 cases. */
 .bs-grid {
     display: grid;
@@ -198,6 +210,16 @@
     .bs-container {
         padding-left: 0.5rem;
         padding-right: 0.5rem;
+    }
+
+    /* Le score encadre le compte de manches par les deux prénoms. À 320 px il
+       passait à deux lignes dès « Joséphine » face à « Anne-Charlotte »
+       (mesuré : 285,8 px pour 272 px disponibles) ; 0.9rem le ramène à 260,6 px,
+       sur une seule ligne. Deux prénoms au maxlength de 15 caractères débordent
+       de toute façon (305,8 px à 0.9rem) : ils passent à deux lignes centrées,
+       ce qui reste lisible et ne fait jamais défiler la page horizontalement. */
+    .bs-score {
+        font-size: 0.9rem;
     }
 }
 
