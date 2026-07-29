@@ -229,8 +229,8 @@ Le front interdit déjà ces cas (cases `disabled`), mais le serveur ne s'y fie 
 
 `renderBsSnapshot(state)` reconstruit toute l'interface depuis l'**état complet**, comme `renderC4Snapshot`. La phase pilote la disposition :
 
-- **placement** : la grande grille montre **ma** flotte ; boutons « 🎲 Mélanger » et « ✓ Je suis prête ».
-- **bataille** : la grande grille devient la grille de tir ; ma flotte passe en **mini-carte** sous elle, non cliquable, avec le nombre de bateaux coulés.
+- **placement** : la grande grille montre **ma** flotte, libellée « Ta flotte » ; boutons « 🎲 Mélanger » et « ✓ Je suis prête ».
+- **bataille** : la grande grille devient la grille de tir ; ma flotte passe en **mini-carte** sous elle, non cliquable. **Chaque grille porte son compteur**, et les deux ne mesurent pas la même chose : « Flotte adverse — *n* bateaux à flot » au-dessus de la grille de tir, « Ta flotte — *n* bateaux coulés » au-dessus de la mini-carte. De l'adversaire je ne sais rien de ses dégâts partiels, donc seul le nombre de bateaux encore entiers a un sens ; de mon côté c'est le nombre de pertes qui inquiète.
 - **fin** : grille verrouillée, bouton « Nouvelle manche » et statut de la revanche.
 
 Les cases non jouables sont `disabled` : le verrouillage hors de son tour et pendant l'animation est porté par le **DOM**, sans drapeau de lock — même choix que les colonnes du Puissance 4.

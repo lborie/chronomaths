@@ -673,6 +673,17 @@ body::after {
     transform: scale(0.97);
 }
 
+/* Le bouton « Nouvelle manche » se désactive quand on a déjà demandé la revanche
+   — Puissance 4 comme bataille navale, via replay.disabled. Sans cet état
+   VISIBLE, il gardait son dégradé animé et son curseur de main : rien ne disait
+   que le clic était déjà pris en compte, et l'enfant recliquait. L'animation est
+   coupée, sinon un bouton grisé continuerait de se faire remarquer. */
+.play-again-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+    animation: none;
+}
+
 /* ============================================================
    MULTIPLAYER STYLES
    ============================================================ */
@@ -1833,7 +1844,8 @@ body::after {
         box-shadow: 0 10px 25px rgba(254, 202, 87, 0.4);
     }
 
-    .play-again-btn:hover {
+    /* :not(:disabled) : aucun indice de survol sur une revanche déjà demandée. */
+    .play-again-btn:not(:disabled):hover {
         transform: translateY(-3px);
         box-shadow: 0 12px 30px rgba(255, 107, 107, 0.3);
     }

@@ -60,7 +60,8 @@ Si un joueur quitte la partie, l'autre est prévenu et peut revenir au hub Jeux.
 - Le serveur place les 4 bateaux au hasard — **Porte-avions** (4 cases), **Croiseur** (3), **Sous-marin** (3), **Torpilleur** (2). Le bouton **« 🎲 Mélanger »** retire une flotte autant de fois qu'on veut, puis **« ✓ Je suis prête »** la verrouille. La bataille commence quand les deux sont prêtes.
 - On tape une case de la grille adverse, elle se met en surbrillance avec ses coordonnées, et le bouton **« 🎯 Feu ! »** tire. Cette confirmation évite qu'un doigt qui glisse gâche un tour.
 - **Touché → on rejoue.** Dans l'eau → la main passe. Quand un bateau est coulé, son nom est annoncé.
-- La première à couler les 4 bateaux adverses gagne. Le score de manches est conservé, et **les deux joueuses doivent cliquer sur « Nouvelle manche »** pour relancer ; la joueuse qui commence alterne.
+- Chaque grille porte son compteur : **« Flotte adverse — *n* bateaux à flot »** au-dessus de la grille de tir, **« Ta flotte — *n* bateaux coulés »** au-dessus de la mini-carte. Des dégâts de l'adversaire on ne sait rien tant qu'un bateau n'est pas coulé, d'où deux compteurs qui ne comptent pas la même chose.
+- La première à couler les 4 bateaux adverses gagne. Le score de manches est conservé et affiche les deux prénoms, dans le même ordre sur les deux écrans. **Les deux joueuses doivent cliquer sur « Nouvelle manche »** pour relancer ; celle qui a déjà cliqué voit son bouton grisé et « ⏳ En attente de … », l'autre voit « 🔄 … veut rejouer ». La joueuse qui commence alterne.
 
 Aucun calcul n'est demandé : c'est une récompense entre deux séries d'entraînement.
 

@@ -13,7 +13,9 @@ const bsEl = {
     score: document.getElementById('bs-score'),
     status: document.getElementById('bs-status'),
     grid: document.getElementById('bs-grid'),
+    gridTitle: document.getElementById('bs-grid-title'),
     minimap: document.getElementById('bs-minimap'),
+    minimapTitle: document.getElementById('bs-minimap-title'),
     minimapWrap: document.getElementById('bs-minimap-wrap'),
     aimLabel: document.getElementById('bs-aim-label'),
     fire: document.getElementById('btn-bs-fire'),
@@ -82,11 +84,13 @@ function renderBsSnapshot(state) {
 
     bsEl.grid.innerHTML = '';
     bsEl.grid.appendChild(bsBuildGrid(state, placement));
+    bsEl.gridTitle.textContent = bsGridTitleText(state);
 
     bsEl.minimapWrap.style.display = placement ? 'none' : 'block';
     if (!placement) {
         bsEl.minimap.innerHTML = '';
         bsEl.minimap.appendChild(bsBuildMinimap(state));
+        bsEl.minimapTitle.textContent = bsMinimapTitleText(state);
     }
 
     bsEl.shuffle.style.display = placement && !locked ? 'block' : 'none';
@@ -101,9 +105,42 @@ function renderBsSnapshot(state) {
     // showBsLost écraserait le message reçu par un texte de tour de jeu, alors
     // même que la grille reste verrouillée par le fold de yourTurn ci-dessus.
     bsEl.status.textContent = bsOnline.lost || bsStatusText(state);
-    bsEl.score.textContent = `🚢 ${state.wins[0]} – ${state.wins[1]} 🚢`;
+    bsUpdateScore(state);
 
     bsRestoreFocus();
+}
+
+// bsUpdateScore rend le score dans l'ORDRE DES SIÈGES, jamais « moi d'abord » :
+// wins est indexé par siège, donc les deux clientes affichent la MÊME chaîne
+// dans le même ordre et l'une peut lire le score sur l'écran de l'autre.
+// Inverser au profit du « je » local produirait deux scores en miroir, illisibles
+// à deux. Même choix que updateC4OnlineScore, qui indexe par couleur.
+function bsUpdateScore(state) {
+    const first = bsOnline.seat === 1 ? bsOnline.myName : bsOnline.opponentName;
+    const second = bsOnline.seat === 1 ? bsOnline.opponentName : bsOnline.myName;
+    bsEl.score.textContent = `🚢 ${first} ${state.wins[0]} – ${state.wins[1]} ${second} 🚢`;
+}
+
+// bsGridTitleText libelle la grande grille, qui change de propriétaire selon la
+// phase. En bataille elle montre la flotte ADVERSE, et enemy.remaining en compte
+// les bateaux encore à flot : c'est le seul consommateur de ce champ.
+//
+// Le compteur adverse et le mien ne mesurent pas la même chose — « à flot » chez
+// l'adversaire, « coulés » chez moi. C'est délibéré : de son côté je ne sais rien
+// de ses dégâts partiels, et de mon côté le nombre de pertes est ce qui inquiète.
+function bsGridTitleText(state) {
+    if (state.phase === 'placement') return 'Ta flotte';
+    const n = state.enemy.remaining;
+    // « à flot » est invariable là où « coulé » s'accorde : les deux compteurs ne
+    // peuvent pas partager un helper d'accord.
+    return `Flotte adverse — ${n} bateau${n > 1 ? 'x' : ''} à flot`;
+}
+
+// bsMinimapTitleText compte MES pertes, comme le demande le spec de la
+// mini-carte. you.ships porte le drapeau sunk par bateau.
+function bsMinimapTitleText(state) {
+    const n = (state.you.ships || []).filter((s) => s.sunk).length;
+    return `Ta flotte — ${n} bateau${n > 1 ? 'x' : ''} coulé${n > 1 ? 's' : ''}`;
 }
 
 // bsBuildGrid construit la grande grille : ma flotte en placement, la grille de
@@ -366,6 +403,14 @@ function bsAnimateShot(shot) {
 // que si le créneau est resté vide, ce qui laisse la priorité à un message
 // d'attente de revanche/placement. C'est aussi ce qui efface l'annonce au tir
 // suivant : bsUpdateRematch l'aura déjà réinitialisée avant le nouvel appel.
+//
+// Un chemin atteignable perd donc l'annonce du bateau qui achève la manche : le
+// snapshot de fin est abandonné pour moi (sendEvent abandonne sur canal plein),
+// l'adversaire demande la revanche, et le snapshot suivant porte à la fois le
+// lastShot inchangé — bsShotChanged le voit neuf, l'animation part — et
+// « 🔄 … veut rejouer », qui occupe déjà le créneau. Acceptable : la ligne de
+// statut annonce de son côté 🏆 ou 😢, et l'attente de revanche est l'information
+// actionnable des deux.
 function bsAnnounceSunk(state) {
     if (bsEl.rematchStatus.textContent !== '') return;
     const shot = state.lastShot;
@@ -399,11 +444,19 @@ function bsAnnounceSunk(state) {
 
 // bsUpdateRematch affiche l'attente, en placement comme après la manche. Le
 // snapshot porte ready[] et rematch[] pour les deux sièges : on peut donc dire
-// précisément qui l'on attend.
+// précisément qui l'on attend, et dire aussi que c'est l'autre qui attend.
 function bsUpdateRematch(state) {
     const meIdx = bsOnline.seat - 1;
     const otherIdx = 1 - meIdx;
     const other = bsOnline.opponentName || 'ton adversaire';
+    const meAsked = state.rematch[meIdx];
+    const themAsked = state.rematch[otherIdx];
+
+    // Posé AVANT toute sortie anticipée. Le piège n'est pas la branche placement
+    // — startRound remet Rematch à zéro, meAsked y est donc toujours faux — mais
+    // la branche « meAsked && !themAsked » juste en dessous : elle sort, et c'est
+    // précisément le cas où le bouton doit se désactiver.
+    bsEl.replay.disabled = meAsked;
 
     if (bsOnline.lost) {
         bsEl.replay.style.display = 'none';
@@ -415,8 +468,12 @@ function bsUpdateRematch(state) {
         bsEl.rematchStatus.textContent = `⏳ En attente de ${other}…`;
         return;
     }
-    if (state.over && state.rematch[meIdx] && !state.rematch[otherIdx]) {
+    if (state.over && meAsked && !themAsked) {
         bsEl.rematchStatus.textContent = `⏳ En attente de ${other}…`;
+        return;
+    }
+    if (state.over && themAsked && !meAsked) {
+        bsEl.rematchStatus.textContent = `🔄 ${other} veut rejouer`;
         return;
     }
     bsEl.rematchStatus.textContent = '';
