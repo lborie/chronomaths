@@ -248,14 +248,175 @@
     }
 }
 
-/* Posée sur la seule case du dernier tir. Le reset universel de style.css
-   la neutralise sous prefers-reduced-motion. */
+/* ============================================================
+   NAUFRAGE — l'emoji porte l'effet, la case n'est que le socle
+   Trois crans monotones, pour qu'ils s'apprennent sans explication :
+     raté   = rien de plus qu'avant, le seul sursaut de la case
+     touché = 💥 sobre, qui tient dans la case
+     coulé  = 💥 qui déborde franchement + ☠️
+   Aucun emoji nouveau n'entre dans l'appli : 💥 vient de l'écran de jonction,
+   ☠️ de l'annonce « ☠️ Tu as coulé le Torpilleur ! » que bsAnnounceSunk pose au
+   même instant. La case voit donc le symbole que la ligne de statut écrit.
+   ============================================================ */
+
+/* Socle, posé sur les deux grilles. Il garde le sursaut d'avant à l'identique et
+   ajoute le contexte dont la couche emoji a besoin.
+
+   position: relative n'est PAS cosmétique. `.bs-container` porte un
+   backdrop-filter, ce qui en fait le bloc conteneur des descendants absolus :
+   mesuré, sans cette ligne le pseudo-élément atterrit au centre du conteneur et
+   non sur sa case. Le retirer « parce que ça ne sert à rien » casse tout l'effet
+   sans lever la moindre erreur.
+
+   z-index fait passer la case au-dessus de ses voisines, qui sont en static :
+   sans lui, l'emoji qui déborde passerait SOUS les cases suivantes dans l'ordre
+   du DOM.
+
+   container-type: size est ce qui dimensionne l'emoji, et c'est LE piège du
+   sujet. Le font-size d'une case ne suit pas sa largeur : mesuré, une case de la
+   grille de tir est un <button> à 13,33 px de police — les boutons n'héritent pas
+   de celle de la page — là où une case de mini-carte est un <div> à 16 px. Un
+   `em` donnerait donc deux tailles différentes sur les deux grilles, et aucune
+   des deux ne bougerait entre un écran de 320 px et un desktop. Les unités de
+   conteneur mesurent l'emoji sur LA CASE : un seul nombre vaut de la case de
+   46,5 px du desktop à celle de 14,96 px de la mini-carte, sans media query.
+   Mesuré : la mise en page ne bouge pas (grille toujours à 420 px, case toujours
+   à 46,5 px) et rien ne rogne — `contain: size` ne clippe pas, seul
+   `contain: paint` le ferait. */
 .bs-cell-boom {
+    position: relative;
+    z-index: 2;
+    container-type: size;
     animation: bsBoom 0.4s ease-out;
 }
 
+/* La couche emoji. Aucune de ces déclarations ne pose `content` : sans content,
+   aucune boîte de pseudo-élément n'est générée, donc un RATÉ — qui ne reçoit que
+   la classe de socle — garde exactement le rendu d'avant.
+
+   opacity: 0 est l'état de REPOS, et c'est là que tient toute la sûreté du
+   dispositif. Une animation sans `animation-fill-mode` revient à son état de base
+   en se terminant, or la classe SURVIT jusqu'au prochain snapshot : état de base
+   invisible ⇒ rien ne reste collé sur la case. Corollaire pour la suite : toute
+   addition à cette couche doit poser son invisibilité DANS LA RÈGLE DE BASE, pas
+   seulement au 100 % de son keyframe.
+
+   Le centrage passe par left/top 50 % + translate(-50%, -50%) et non par
+   inset: 0 + place-items: center : la seconde forme décale le glyphe dès qu'il
+   dépasse sa boîte, ce que fait tout l'effet ici.
+
+   pointer-events: none est fonctionnel : le glyphe déborde sur des cases
+   VOISINES qui, elles, sont cliquables. */
+.bs-cell-boom::before,
+.bs-cell-boom::after {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    line-height: 1;
+    pointer-events: none;
+    opacity: 0;
+    /* Halo blanc : le glyphe passe sur --bs-hit (#ff4757), dont le rouge mange
+       celui de l'explosion. drop-shadow suit l'alpha du glyphe, là où text-shadow
+       n'est pas fiable sur un emoji en couleur. */
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95));
+}
+
+/* La double déclaration de `content` n'est pas une coquille. La forme à deux
+   valeurs donne un texte alternatif VIDE aux lecteurs d'écran qui restituent le
+   contenu généré ; la déclaration simple qui la précède est le repli des moteurs
+   qui ne parsent pas la barre oblique — sans elle, la déclaration invalide
+   tomberait et il n'y aurait plus d'emoji du tout. */
+.bs-boom-hit::before {
+    content: '💥';
+    content: '💥' / '';
+    font-size: 80cqh;
+    animation: bsSpark 0.42s linear;
+}
+
+/* La case d'impact passe au-dessus des cases de l'onde, qui restent à 2. */
+.bs-boom-sunk {
+    z-index: 3;
+}
+
+/* .bs-boom-wave ne porte QUE l'explosion : c'est ce qui interdit
+   structurellement à la tête de mort d'atterrir sur une case d'onde. */
+.bs-boom-sunk::before,
+.bs-boom-wave::before {
+    content: '💥';
+    content: '💥' / '';
+    font-size: 170cqh;
+    animation: bsBlast 0.62s linear;
+}
+
+.bs-boom-sunk::after {
+    content: '☠️';
+    content: '☠️' / '';
+    font-size: 90cqh;
+    animation: bsSkull 0.5s ease-out 0.16s;
+}
+
+/* MÊME emoji, direction INVERSE selon le sens du coulage. Sur la grille de tir la
+   tête de mort MONTE : je viens de gagner quelque chose, c'est le « + points »
+   d'un jeu vidéo. Sur ma mini-carte elle DESCEND et sombre sous la case : je
+   viens de perdre un bateau. La grammaire est la même des deux côtés — un emoji,
+   un mouvement — seule la direction dit qui a gagné. Un ☠️ qui monte en fanfare
+   sur ma propre flotte serait à contresens. */
+.bs-boom-mine::after {
+    animation-name: bsSkullSink;
+}
+
+/* L'onde le long de MON bateau : un cran par case d'écart depuis l'impact. Trois
+   suffisent, le plus grand bateau (Porte-avions) faisant 4 cases.
+   ⚠️ animation-delay n'est PAS neutralisé par le reset prefers-reduced-motion,
+   qui ne touche que animation-duration, -iteration-count et transition-duration.
+   C'est sans conséquence ici précisément parce qu'aucun animation-fill-mode n'est
+   utilisé : pendant le délai le pseudo est à son état de base, invisible. Un
+   `fill-mode: backwards` le rendrait à son 0 % et est donc proscrit. */
+.bs-wave-1::before { animation-delay: 0.08s; }
+.bs-wave-2::before { animation-delay: 0.16s; }
+.bs-wave-3::before { animation-delay: 0.24s; }
+
+/* ------------------------------------------------------------
+   KEYFRAMES — chacune se termine au 100 % sur l'état de REPOS EXACT : emoji
+   transparent, case à l'échelle 1, aucune transformation résiduelle. C'est ce qui
+   rend le reset prefers-reduced-motion de style.css correct : il force
+   animation-duration à 0,01 ms SANS poser animation: none, donc le navigateur
+   saute au 100 % puis revient à la base — et les deux sont l'état de repos.
+   ------------------------------------------------------------ */
+
+/* INCHANGÉ — le sursaut de la case, socle des trois crans. */
 @keyframes bsBoom {
     0%   { transform: scale(1); }
     45%  { transform: scale(1.35); }
     100% { transform: scale(1); }
+}
+
+@keyframes bsSpark {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+    30%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* `linear` et non ease-out : les pourcentages valent alors des millisecondes, et
+   les deux battements tombent où la lecture des keyframes le dit. Le sens est
+   complet au pic, à 280 ms — ce qui compte, parce qu'un rendu peut couper
+   l'animation en vol (les deux grilles sont reconstruites à chaque snapshot). */
+@keyframes bsBlast {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.30) rotate(-20deg); }
+    18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.00) rotate(6deg); }
+    30%  { opacity: 1; transform: translate(-50%, -50%) scale(0.88) rotate(0deg); }
+    45%  { opacity: 1; transform: translate(-50%, -50%) scale(1.18) rotate(-4deg); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.45) rotate(0deg); }
+}
+
+@keyframes bsSkull {
+    0%   { opacity: 0; transform: translate(-50%, -40%)  scale(0.5); }
+    35%  { opacity: 1; transform: translate(-50%, -110%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -190%) scale(1); }
+}
+
+@keyframes bsSkullSink {
+    0%   { opacity: 0; transform: translate(-50%, -60%) scale(0.5); }
+    35%  { opacity: 1; transform: translate(-50%, 10%)  scale(1); }
+    100% { opacity: 0; transform: translate(-50%, 90%)  scale(0.9); }
 }
