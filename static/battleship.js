@@ -372,7 +372,7 @@ function applyBsState(state) {
     bsUpdateRematch(state);
     if (animate) {
         bsAnnounceSunk(state);
-        bsAnimateShot(state.lastShot);
+        bsAnimateShot(state);
     }
 }
 
@@ -383,17 +383,65 @@ function bsShotChanged(before, now) {
     return before.row !== now.row || before.col !== now.col || before.by !== now.by;
 }
 
-// bsAnimateShot marque brièvement la case touchée. La classe est posée sur la
-// seule case du dernier tir, jamais sur toutes les cases : sinon chaque rendu
-// rejouerait l'animation de l'ensemble de la grille.
-function bsAnimateShot(shot) {
-    const mine = shot.by === bsOnline.seat;
-    const container = mine ? bsEl.grid : bsEl.minimap;
-    const sel = mine
-        ? `.bs-cell-target[data-row="${shot.row}"][data-col="${shot.col}"]`
-        : `.bs-mini-cell:nth-child(${shot.row * BS_SIZE + shot.col + 1})`;
-    const cell = container.querySelector(sel);
-    if (cell) cell.classList.add('bs-cell-boom');
+// bsMySunkShipAt retrouve MON bateau coulé dont les cases couvrent celles d'un
+// tir. Partagé par l'annonce et par l'animation, qui faisaient la même recherche.
+function bsMySunkShipAt(state, shot) {
+    return (state.you.ships || []).find(
+        (s) => s.sunk && s.cells.some((c) => c.row === shot.row && c.col === shot.col)
+    );
+}
+
+// bsAnimateShot marque le dernier tir. Les classes sont posées sur les seules
+// cases concernées, jamais sur toute la grille : sinon chaque rendu rejouerait
+// l'animation de l'ensemble.
+//
+// Elle reçoit l'ÉTAT COMPLET et non le seul shot, parce que la mini-carte a
+// besoin de state.you.ships pour connaître les cases de mon bateau. D'où
+// l'asymétrie assumée entre les deux grilles : sur la grille de tir le protocole
+// ne dit rien de la flotte adverse — et rien ne lui est ajouté — donc on ne
+// connaît que la case tirée, et l'effet ne porte que sur elle et sur ce qui
+// déborde d'elle. Sur ma mini-carte je connais toute la coque, l'onde peut donc
+// la parcourir.
+function bsAnimateShot(state) {
+    const shot = state.lastShot;
+    const sunk = shot.result === 'sunk';
+    // Deux crans seulement : un raté comme un touché ne reçoivent que le socle,
+    // soit exactement le rendu d'avant, et l'emoji est réservé au coulage. Un cran
+    // intermédiaire pour le touché a été essayé puis retiré — voir la raison,
+    // mesurée, dans battleship.css : une étincelle qui reste dans la case tombe
+    // sur le rouge plein de --bs-hit et devient illisible.
+    const level = sunk ? 'bs-boom-sunk' : '';
+
+    if (shot.by === bsOnline.seat) {
+        bsAddBoom(bsEl.grid.querySelector(
+            `.bs-cell-target[data-row="${shot.row}"][data-col="${shot.col}"]`), level);
+        return;
+    }
+
+    // Les 64 divs de la mini-carte sont en ordre ligne par ligne, comme les
+    // boutons indexés par bsRestoreFocus.
+    const minis = bsEl.minimap.querySelectorAll('.bs-mini-cell');
+    bsAddBoom(minis[shot.row * BS_SIZE + shot.col], level, sunk ? 'bs-boom-mine' : '');
+    if (!sunk) return;
+
+    // Le rang est la DISTANCE à l'impact et non l'index de tri : un bateau touché
+    // en son milieu part alors des deux côtés à la fois, ce qui se lit comme une
+    // onde et non comme un balayage de gauche à droite.
+    //
+    // Si you.ships perdait cells ou sunk, ship serait undefined et la boucle vide :
+    // on retomberait sur la seule explosion d'impact. Dégradation, pas plantage.
+    const ship = bsMySunkShipAt(state, shot);
+    for (const c of (ship ? ship.cells : [])) {
+        const rank = Math.abs(c.row - shot.row) + Math.abs(c.col - shot.col);
+        if (rank) bsAddBoom(minis[c.row * BS_SIZE + c.col], 'bs-boom-wave', 'bs-wave-' + rank);
+    }
+}
+
+// bsAddBoom pose le socle et les niveaux sur une case, si elle existe. Le filtre
+// n'est pas cosmétique : classList.add('') lève une SyntaxError, et le niveau est
+// la chaîne vide sur un raté.
+function bsAddBoom(cell, ...classes) {
+    if (cell) cell.classList.add('bs-cell-boom', ...classes.filter(Boolean));
 }
 
 // bsAnnounceSunk annonce, dans le créneau de #bs-rematch-status, le nom du
@@ -436,9 +484,7 @@ function bsAnnounceSunk(state) {
 
     // Mon bateau coulé : déterministe et déjà sans delta, laissé inchangé — on
     // cherche celui dont les cases couvrent les coordonnées du dernier tir.
-    const ship = (state.you.ships || []).find(
-        (s) => s.sunk && s.cells.some((c) => c.row === shot.row && c.col === shot.col)
-    );
+    const ship = bsMySunkShipAt(state, shot);
     if (ship) bsEl.rematchStatus.textContent = `☠️ Ton ${ship.name} est coulé !`;
 }
 
