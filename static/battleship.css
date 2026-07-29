@@ -321,17 +321,21 @@
     filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95));
 }
 
-/* La double déclaration de `content` n'est pas une coquille. La forme à deux
-   valeurs donne un texte alternatif VIDE aux lecteurs d'écran qui restituent le
-   contenu généré ; la déclaration simple qui la précède est le repli des moteurs
-   qui ne parsent pas la barre oblique — sans elle, la déclaration invalide
-   tomberait et il n'y aurait plus d'emoji du tout. */
-.bs-boom-hit::before {
-    content: '💥';
-    content: '💥' / '';
-    font-size: 80cqh;
-    animation: bsSpark 0.42s linear;
-}
+/* ⚠️ Un cran intermédiaire pour le simple touché a été essayé puis RETIRÉ, et il
+   ne faut pas le réintroduire sans relire ceci. Une étincelle de 0,8 × la case
+   reste entièrement DANS la case — or une case touchée a déjà `--bs-hit` en fond,
+   soit un rouge plein (#ff4757). Le glyphe 💥 étant lui-même rouge-orange, le
+   résultat mesuré à l'écran est une tache pâle illisible, et non une explosion.
+   Deux correctifs essayés et rejetés : agrandir à 1,18 × la case n'a presque rien
+   changé (le glyphe déborde trop peu), et un halo blanc en deux passes n'a fait
+   aucune différence visible. Aller plus loin en taille aurait effacé la
+   distinction avec le coulé.
+   Le coulé, lui, échappe au problème pour une raison précise : à 1,7 × la case il
+   DÉBORDE, donc les pointes de l'étoile et la tête de mort atterrissent sur l'eau
+   pâle des cases voisines, où elles se détachent. C'est le débordement qui rend
+   l'emoji lisible, pas sa taille en soi.
+   Le touché reste donc distingué du raté par la COULEUR de la case, comme avant,
+   et l'emoji est réservé au seul événement que l'utilisateur voulait marquer. */
 
 /* La case d'impact passe au-dessus des cases de l'onde, qui restent à 2. */
 .bs-boom-sunk {
@@ -339,7 +343,12 @@
 }
 
 /* .bs-boom-wave ne porte QUE l'explosion : c'est ce qui interdit
-   structurellement à la tête de mort d'atterrir sur une case d'onde. */
+   structurellement à la tête de mort d'atterrir sur une case d'onde.
+   La double déclaration de `content` n'est pas une coquille : la forme à deux
+   valeurs donne un texte alternatif VIDE aux lecteurs d'écran qui restituent le
+   contenu généré (vérifiée retenue par le moteur), et la déclaration simple qui la
+   précède est le repli de ceux qui ne parsent pas la barre oblique — sans elle, la
+   déclaration invalide tomberait et il n'y aurait plus d'emoji du tout. */
 .bs-boom-sunk::before,
 .bs-boom-wave::before {
     content: '💥';
@@ -389,12 +398,6 @@
     0%   { transform: scale(1); }
     45%  { transform: scale(1.35); }
     100% { transform: scale(1); }
-}
-
-@keyframes bsSpark {
-    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-    30%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
 }
 
 /* `linear` et non ease-out : les pourcentages valent alors des millisecondes, et

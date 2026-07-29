@@ -405,9 +405,12 @@ function bsMySunkShipAt(state, shot) {
 function bsAnimateShot(state) {
     const shot = state.lastShot;
     const sunk = shot.result === 'sunk';
-    // Échelle monotone — rien, étincelle, explosion — pour qu'elle s'apprenne
-    // sans qu'on l'explique. Un raté ne reçoit que le socle, soit le rendu d'avant.
-    const level = sunk ? 'bs-boom-sunk' : shot.result === 'hit' ? 'bs-boom-hit' : '';
+    // Deux crans seulement : un raté comme un touché ne reçoivent que le socle,
+    // soit exactement le rendu d'avant, et l'emoji est réservé au coulage. Un cran
+    // intermédiaire pour le touché a été essayé puis retiré — voir la raison,
+    // mesurée, dans battleship.css : une étincelle qui reste dans la case tombe
+    // sur le rouge plein de --bs-hit et devient illisible.
+    const level = sunk ? 'bs-boom-sunk' : '';
 
     if (shot.by === bsOnline.seat) {
         bsAddBoom(bsEl.grid.querySelector(
