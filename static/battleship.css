@@ -1,0 +1,239 @@
+/* ============================================================
+   BATAILLE NAVALE
+   ============================================================ */
+
+:root {
+    --bs-water: #dceefb;
+    --bs-water-dark: #b6ddf7;
+    --bs-ship: #6b7a8f;
+    --bs-hit: #ff4757;
+    --bs-sunk: #2f3542;
+    --bs-miss: #8fb8d8;
+}
+
+.bs-container {
+    background: var(--card-bg);
+    border-radius: 1.5rem;
+    padding: clamp(0.75rem, 3vw, 1.5rem);
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    backdrop-filter: blur(10px);
+}
+
+.bs-score {
+    display: block;
+    text-align: center;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.bs-status {
+    text-align: center;
+    font-weight: 600;
+    min-height: 1.75rem;
+    margin-bottom: 0.75rem;
+}
+
+/* 9 colonnes : la gouttière des numéros de ligne, puis les 8 cases. */
+.bs-grid {
+    display: grid;
+    grid-template-columns: auto repeat(8, 1fr);
+    gap: 3px;
+    padding: 4px;
+    max-width: 420px;
+    margin: 0 auto;
+    background: linear-gradient(160deg, var(--bs-water), var(--bs-water-dark));
+    border-radius: 0.9rem;
+}
+
+.bs-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-light);
+    min-width: 1rem;
+}
+
+.bs-cell {
+    aspect-ratio: 1;
+    border: none;
+    padding: 0;
+    border-radius: 0.25rem;
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.bs-cell-target {
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Case non jouable : ni curseur ni indice, mais l'apparence de la grille ne
+   change pas — un enfant doit continuer à lire le plateau. */
+.bs-cell-target:disabled {
+    cursor: default;
+}
+
+.bs-cell-target:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.bs-cell-ship { background: var(--bs-ship); }
+.bs-cell-sunk { background: var(--bs-sunk); }
+.bs-cell-hit  { background: var(--bs-hit); }
+.bs-cell-miss { background: var(--bs-miss); }
+
+/* Visée en box-shadow inset et NON en outline : .bs-cell-target:focus-visible
+   ci-dessus porte déjà un outline, avec une spécificité (0,2,0) supérieure à
+   celle de cette classe (0,1,0) — et la spécificité l'emporte sur l'ordre
+   source. Or dans le flux clavier la MÊME case est visée et focalisée : un
+   outline ici serait toujours perdu, et l'utilisatrice clavier ne pourrait pas
+   distinguer « focalisée » de « focalisée et visée ». Deux propriétés
+   différentes coexistent, les deux indices s'affichent ensemble. */
+.bs-cell-aimed {
+    box-shadow: 0 0 0 3px var(--accent) inset;
+}
+
+.bs-aim {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    min-height: 44px;
+}
+
+.bs-aim-label {
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-width: 2.5rem;
+    text-align: center;
+}
+
+.bs-fire-btn {
+    min-height: 44px;
+    padding: 0.5rem 1.25rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, var(--c4-red, #ff4757), #ff6b81);
+    border: none;
+    border-radius: 0.75rem;
+    cursor: pointer;
+}
+
+.bs-fire-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.bs-minimap-wrap {
+    text-align: center;
+    margin-top: 0.75rem;
+}
+
+.bs-minimap-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.bs-minimap {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    max-width: 140px;
+    margin: 0.25rem auto 0;
+}
+
+.bs-mini-cell {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.bs-mini-ship { background: var(--bs-ship); }
+.bs-mini-hit  { background: var(--bs-hit); }
+.bs-mini-sunk { background: var(--bs-sunk); }
+.bs-mini-miss { background: var(--bs-miss); }
+
+.bs-actions {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bs-shuffle-btn,
+.bs-ready-btn {
+    min-height: 44px;
+    padding: 0.5rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 2px solid var(--primary);
+    border-radius: 0.75rem;
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.bs-rematch-status {
+    min-height: 1.25rem;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+/* Sur écran étroit, les 8 colonnes se disputent la largeur : on rend à la
+   grille les pixels des paddings horizontaux plutôt que de rétrécir les cases.
+   Le gap reste à 3px — en dessous, la grille cesse de se lire. */
+@media (max-width: 480px) {
+    .bs-container {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+}
+
+/* ============================================================
+   HOVER — pointeur fin uniquement (jamais sur tactile)
+   ============================================================ */
+@media (hover: hover) and (pointer: fine) {
+    .bs-entry-btn:hover {
+        border-color: var(--primary);
+        transform: translateX(5px) scale(1.02);
+    }
+
+    /* :not(:disabled) : aucun indice sur une case déjà tirée ou hors tour. */
+    .bs-cell-target:not(:disabled):hover {
+        background: rgba(255, 255, 255, 1);
+        box-shadow: 0 0 0 2px var(--accent) inset;
+    }
+
+    .bs-fire-btn:not(:disabled):hover {
+        transform: translateY(-2px);
+    }
+
+    .bs-shuffle-btn:hover,
+    .bs-ready-btn:hover {
+        background: var(--primary-light);
+    }
+}
+
+/* Posée sur la seule case du dernier tir. Le reset universel de style.css
+   la neutralise sous prefers-reduced-motion. */
+.bs-cell-boom {
+    animation: bsBoom 0.4s ease-out;
+}
+
+@keyframes bsBoom {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}

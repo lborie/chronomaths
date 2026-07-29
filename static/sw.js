@@ -1,11 +1,13 @@
-const CACHE_NAME = 'chronomaths-v11';
+const CACHE_NAME = 'chronomaths-v15';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/style.css',
   '/games.css',
+  '/battleship.css',
   '/app.js',
   '/games.js',
+  '/battleship.js',
   '/icon.svg',
   '/manifest.json'
 ];
